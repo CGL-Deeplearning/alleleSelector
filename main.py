@@ -9,32 +9,31 @@ from modules.FastaHandler import FastaHandler
 class View:
     def __init__(self, chromosome_name, bam_file_path, reference_file_path, window_size): #, output_dir, window_size, window_cutoff, coverage_cutoff, map_quality_cutoff, vcf_quality_cutoff, coverage_threshold, threads):
         # --- initialize handlers ---
-        self.candidate_finder = CandidateFinder()
         self.bam_handler = BamHandler(bam_file_path)
         self.fasta_handler = FastaHandler(reference_file_path)
 
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
         self.window_size = window_size
-        self.current_position = 0
+        self.reference_position = 100000
 
-    def iterate_windows(self):
+    def parse_window(self):
         '''
         Given a user defined window size, iterate through windows in the BAM and collect candidate alleles
         '''
-
-        reference_sequence = self.fasta_handler.get_sequence(chromosome_name=self.chromosome_name,
-                                                             start=self.current_position,
-                                                             stop=self.current_position+self.window_size)
-
         reads = self.bam_handler.get_reads(chromosome_name=self.chromosome_name,
-                                           start=self.current_position,
-                                           stop=self.current_position+self.window_size)
+                                           start=self.reference_position,
+                                           stop=self.reference_position+self.window_size)
 
-        print(reference_sequence)
-        print(reads)
+        self.candidate_finder = CandidateFinder(reads=reads,
+                                                fasta_handler=self.fasta_handler,
+                                                chromosome_name=self.chromosome_name,
+                                                window_ref_start_position=self.reference_position)
 
-        # self.candidates = self.candidate_finder.parse_reads()
+        # print(reference_sequence)
+        # print(reads)
+
+        self.candidate_finder.parse_reads(reads=reads)
 
 if __name__ == '__main__':
     '''
@@ -94,7 +93,7 @@ if __name__ == '__main__':
                 # output_dir = FLAGS.output_dir,
                 # threads = FLAGS.max_threads)
 
-    view.iterate_windows()
+    view.parse_window()
 
 # usage example:
 # python3 main.py --bam /Users/saureous/data/chr3_200k.bam --ref /Users/saureous/data/chr3.fa --chromosome_name chr3 --window_size 1000
