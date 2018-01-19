@@ -3,59 +3,61 @@ from collections import defaultdict
 """
 CandidateFinder finds possible positions based on mismatches we see in reads.
 It parses through each read of a site and finds possible candidate positions.
-"""
 
+Dictionaries it updates:
+- candidate_by_read:    records at each position what reads had mismatches  {int -> list}
+- coverage:             records coverage of a position                      {int -> int}
+- mismatch_count:       records number of mismatches in a position          {int -> int}
+
+Other data structures:
+- candidate_positions (set):    set of positions that of potential candidate variants
+- merged_windows (list):        list of windows of potential candidate variants.
+
+Merged_windows is constructed from candidate_positions. If two positions fall within
+MERGE_WINDOW_DISTANCE we merge them in a single window.
+"""
+DEFAULT_MIN_MAP_QUALITY = 10
+MERGE_WINDOW_DISTANCE = 10
+MERGE_WINDOW_OFFSET = 2
 
 class CandidateFinder:
     """
     Given reads that align to a site and a pointer to the reference fasta file handler,
-    candidate finder finds possible variant candidates of that site.
+    candidate finder finds possible variant candidates_by_read of that site.
     """
-    def __init__(self, reads, fasta_handler, chromosome_name, window_ref_start_position):
+    def __init__(self, reads, fasta_handler, chromosome_name, window_start_position, window_end_position):
         """
         Initialize a candidate finder object.
         :param reads: Reads that align to the site
         :param fasta_handler: Reference sequence handler
         :param chromosome_name: Chromosome name
-        :param window_ref_start_position: Start site of the window
+        :param window_start_position: Start site of the window
         """
-        self.window_ref_start_position = window_ref_start_position
+        self.window_start_position = window_start_position
+        self.window_end_position = window_end_position
         self.chromosome_name = chromosome_name
         self.fasta_handler = fasta_handler
         self.reads = reads
 
-        # cigar key map based on operation.
-        # details: http://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.cigartuples
-        self.cigar_key = {0: "MATCH",
-                          1: "INSERT",
-                          2: "DELETE",
-                          3: "REFSKIP",
-                          4: "SOFTCLIP",
-                          5: "HARDCLIP",
-                          6: "PAD"}
+        # the store which reads are creating candidates in that position
+        self.candidates_by_read = defaultdict(list)
+        self.coverage = defaultdict(int)
+        self.mismatch_count = defaultdict(int)
+        self.candidate_positions = set()
+        # all merged windows
+        self.merged_windows = []
 
-        # for which operation we should increase the reference position
-        self.ref_advancement_by_cigar = {"MATCH": True,
-                                         "INSERT": False,
-                                         "DELETE": True,
-                                         "REFSKIP": False,
-                                         "SOFTCLIP": False,
-                                         "HARDCLIP": False,
-                                         "PAD": False}
+    def print_positions(self):
+        for pos in sorted(self.candidate_positions):
+            print(pos, self.mismatch_count[pos], self.coverage[pos])
 
-        # for which cigar operations we should increase the read position
-        self.read_advancement_by_cigar = {"MATCH": True,
-                                          "INSERT": True,
-                                          "DELETE": False,
-                                          "REFSKIP": True,
-                                          "SOFTCLIP": True,
-                                          "HARDCLIP": False,
-                                          "PAD": True}
+    def print_windows(self):
+        print(len(self.merged_windows))
+        for window in self.merged_windows:
+            print(window[0], window[1], window[2])
 
-        # the candidates found in reads
-        self.candidates = defaultdict(list)
-
-    def get_read_stop_position(self, read):
+    @staticmethod
+    def get_read_stop_position(read):
         """
         Returns the stop position of the reference to where the read stops aligning
         :param read: The read
@@ -76,17 +78,35 @@ class CandidateFinder:
 
         return ref_alignment_stop
 
-    def parse_reads(self, reads):
+    def merge_positions(self):
         """
-        Parse reads to aligned to a site to find variants
-        :param reads: Set of reads aligned
+        Merge candidate positions we discovered in candidate positions set.
+        If two positions are within a window they are merged in one window.
+
+        This method updates merged_windows list where each entry is:
+        (chromosome_name, start_position, end_position)
         :return:
         """
+        start_pos = -1
+        end_pos = -1
+        for pos in sorted(self.candidate_positions):
+            if start_pos == -1 and end_pos == -1:
+                start_pos = pos
+                end_pos = pos
+            # if position is within window from previous position
+            elif end_pos + MERGE_WINDOW_DISTANCE >= pos:
+                end_pos = pos
+            # else call it a window and start a new window
+            else:
+                self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
+                start_pos = pos
+                end_pos = pos
 
-        for read in reads:
-            # check if the mapping quality of the read is above threshold
-            if read.mapping_quality > 0:
-                self.find_read_candidates(read=read)
+        # if a window was left open inside loop
+        if start_pos != -1:
+            self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
+
+
 
     def parse_match(self, alignment_position, read_sequence, ref_sequence, read_name):
         """
@@ -100,8 +120,11 @@ class CandidateFinder:
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
         for i in range(len(read_sequence)):
+            self.coverage[alignment_position+i] += 1
             if read_sequence[i] != ref_sequence[i]:
-                self.candidates[alignment_position].append(read_name)
+                self.mismatch_count[alignment_position+i] += 1
+                self.candidates_by_read[alignment_position+i].append(read_name)
+                yield alignment_position + i
 
     def parse_delete(self, alignment_position, length, read_name):
         """
@@ -113,10 +136,14 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
+        self.coverage[alignment_position] += 1
         start = alignment_position-1
         stop = alignment_position + length + 1
-        for i in range(start,stop):
-            self.candidates[i].append(read_name)
+        for i in range(start, stop):
+            self.mismatch_count[i] += 1
+            self.candidates_by_read[i].append(read_name)
+            yield i
+            yield i-1
 
     def parse_insert(self, alignment_position, length, read_name):
         """
@@ -128,7 +155,20 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        self.candidates[alignment_position].append(read_name)
+        self.mismatch_count[alignment_position] += 1
+        self.candidates_by_read[alignment_position].append(read_name)
+        yield alignment_position
+
+    def parse_reads(self, reads):
+        """
+        Parse reads to aligned to a site to find variants
+        :param reads: Set of reads aligned
+        :return:
+        """
+        for read in reads:
+            # check if the mapping quality of the read is above threshold
+            if read.mapping_quality > DEFAULT_MIN_MAP_QUALITY:
+                self.candidate_positions.update(self.find_read_candidates(read=read))
 
     def find_read_candidates(self, read):
         """
@@ -138,7 +178,6 @@ class CandidateFinder:
 
         Read candidates use a set data structure to find all positions in the read that has a possible variant.
         """
-        read_candidates = set()
         ref_alignment_start = read.reference_start
         ref_alignment_stop = self.get_read_stop_position(read)
         cigar_tuples = read.cigartuples
@@ -147,25 +186,20 @@ class CandidateFinder:
                                                        start=ref_alignment_start,
                                                        stop=ref_alignment_stop)
 
-        corresponding_ref_sequence = ''
-        # DEBUG
-        # expanded_cigar used for debugging purpose, giving us the cigar indepent of the number
-        # so 3M4I cigar in extended cigar will be MMMIIII.
-        expanded_cigar = ''
-
         # read_index: index of read sequence
-        # alignment_position: position that the current cigar tuple aligns to in reference
+        # ref_index: index of reference sequence
         read_index = 0
         ref_index = 0
         for cigar in cigar_tuples:
             cigar_code = cigar[0]
             length = cigar[1]
+
             # get the sequence segments that are effected by this operation
             ref_sequence_segment = ref_sequence[ref_index:ref_index+length]
             read_sequence_segment = read_sequence[read_index:read_index+length]
 
             # send the cigar tuple to get attributes we got by this operation
-            ref_index_increment, read_index_increment, expanded_cigar_segment = \
+            ref_index_increment, read_index_increment, candidate_positions = \
                 self.parse_cigar_tuple(cigar_code=cigar_code,
                                        length=length,
                                        alignment_position=ref_alignment_start+ref_index,
@@ -177,24 +211,9 @@ class CandidateFinder:
             read_index += read_index_increment
             ref_index += ref_index_increment
 
-            # DEBUG
-            # for debugging create the extended cigar and reference sequence
-            expanded_cigar += expanded_cigar_segment
-            corresponding_ref_sequence += ref_sequence_segment
-
-            # print("----------")
-            # print(ref_sequence_segment)
-            # print(expanded_cigar_segment)
-            # print(read_sequence_segment)
-
-        # DEBUG
-        # print("--------------------------")
-        print(ref_alignment_start)
-        print(corresponding_ref_sequence)
-        print(expanded_cigar)
-        print(read_sequence)
-        print(read_candidates)
-        print("--------------------------")
+            for pos in candidate_positions:
+                if self.window_start_position <= pos <= self.window_end_position:
+                    yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
         """
@@ -206,48 +225,61 @@ class CandidateFinder:
         :param read_sequence: Read sequence
         :param read_name: Read ID
         :return:
+
+        cigar key map based on operation.
+        details: http://pysam.readthedocs.io/en/latest/api.html#pysam.AlignedSegment.cigartuples
+        0: "MATCH",
+        1: "INSERT",
+        2: "DELETE",
+        3: "REFSKIP",
+        4: "SOFTCLIP",
+        5: "HARDCLIP",
+        6: "PAD"
         """
         # get what kind of code happened
-        cigar_operation = self.cigar_key[cigar_code]
-        ref_index_increment = 0
-        read_index_increment = 0
-        expanded_cigar_string = ''
+        ref_index_increment = length
+        read_index_increment = length
+
         # why is this here?
-        candidates = set()
+        candidate_positions = set()
 
         # deal different kinds of operations
-        if cigar_operation == "MATCH":
-            self.parse_match(alignment_position=alignment_position,
-                             read_sequence=read_sequence,
-                             ref_sequence=ref_sequence,
-                             read_name=read_name)
+        if cigar_code == 0:
+            # match
+            candidate_positions.update(self.parse_match(alignment_position=alignment_position,
+                                                        read_sequence=read_sequence,
+                                                        ref_sequence=ref_sequence,
+                                                        read_name=read_name))
+        elif cigar_code == 1:
+            # insert
+            candidate_positions.update(self.parse_insert(alignment_position=alignment_position,
+                                                         length=length,
+                                                         read_name=read_name))
+            ref_index_increment = 0
+        elif cigar_code == 2:
+            # delete
+            candidate_positions.update(self.parse_delete(alignment_position=alignment_position,
+                                                         length=length,
+                                                         read_name=read_name))
+            read_index_increment = 0
+        elif cigar_code == 3:
+            # ref skip
+            ref_index_increment = 0
 
-        elif cigar_operation == "INSERT":
-            self.parse_insert(alignment_position=alignment_position, length=length, read_name=read_name)
-
-        elif cigar_operation == "DELETE":
-            self.parse_delete(alignment_position=alignment_position, length=length, read_name=read_name)
-
-        elif cigar_operation == "REFSKIP":
-            pass
-
-        elif cigar_operation == "SOFTCLIP":
-            pass
-
-        elif cigar_operation == "PAD":
-            pass
-
+        elif cigar_code == 4:
+            # soft clip
+            ref_index_increment = 0
+        elif cigar_code == 5:
+            # hard clip
+            ref_index_increment = 0
+            read_index_increment = 0
+        elif cigar_code == 6:
+            # pad
+            ref_index_increment = 0
+            read_index_increment = 0
         else:
-            raise("INVALID CIGAR CODE: %s"%cigar_code)
+            raise("INVALID CIGAR CODE: %s" % cigar_code)
 
-        if self.ref_advancement_by_cigar[cigar_operation]:
-            ref_index_increment = length
-
-        if self.read_advancement_by_cigar[cigar_operation]:
-            read_index_increment = length
-
-        expanded_cigar_string += cigar_operation[0]*length
-
-        return ref_index_increment, read_index_increment, expanded_cigar_string
+        return ref_index_increment, read_index_increment, candidate_positions
 
 

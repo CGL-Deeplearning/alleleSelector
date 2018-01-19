@@ -4,6 +4,8 @@ import time
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
+from  modules.vcf_handler import VCFFileProcessor
+from collections import defaultdict
 
 """
 alignmentPolish finds possible variant sites in given bam file.
@@ -28,6 +30,8 @@ class View:
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
 
+        self.test_positions = defaultdict(int)
+
     def parse_window(self, start_position, end_position):
         """
         Find possible candidate windows.
@@ -46,10 +50,31 @@ class View:
         # merge candidate positions to windows
         candidate_finder.merge_positions()
         # print the windows we got
-        candidate_finder.print_windows()
+        return candidate_finder.merged_windows
 
-    def test(self):
-        self.parse_window(start_position=100000, end_position=200000)
+    def test(self, vcf_file_path, start_position, end_position):
+        merged_windows = self.parse_window(start_position=start_position, end_position=end_position)
+        for windows in merged_windows:
+            start_pos = windows[1]
+            end_pos = windows[2]
+            for pos in range(start_pos, end_pos+1):
+                self.test_positions[pos] = 1
+
+        vcf_handler = VCFFileProcessor(vcf_file_path)
+        vcf_handler.populate_dictionary(self.chromosome_name, start_position, end_position, hom_filter=True)
+
+        # get the vcf dictionary of that region
+        vcf_dict = vcf_handler.get_variant_dictionary()
+        for pos in vcf_dict.keys():
+            for rec in vcf_dict[pos]:
+                rec_len = len(rec.ref)
+                rec_start = pos
+                rec_end = rec_start + rec_len
+                for i in range(rec_start, rec_end):
+                    if self.test_positions[i] != 1:
+                        print(i)
+
+
 
     def do_parallel(self, max_threads=5):
         """
@@ -74,7 +99,6 @@ class View:
             print("Total time: ", end_time-start_time)
             exit()
 
-
 if __name__ == '__main__':
     '''
     Processes arguments and performs tasks to generate the pileup.
@@ -92,6 +116,12 @@ if __name__ == '__main__':
         type=str,
         required=True,
         help="BAM file containing reads of interest."
+    )
+    parser.add_argument(
+        "--vcf",
+        type=str,
+        required=True,
+        help="VCF file for testing."
     )
     parser.add_argument(
         "--chromosome_name",
@@ -113,7 +143,7 @@ if __name__ == '__main__':
                 reference_file_path=FLAGS.ref)
 
     # view.do_parallel(max_threads=FLAGS.max_threads)
-    view.test()
+    view.test(FLAGS.vcf, start_position=100000, end_position=400000)
 
 # usage example:
 # python3 main.py --bam /Users/saureous/data/chr3_200k.bam --ref /Users/saureous/data/chr3.fa --chromosome_name chr3 --window_size 1000

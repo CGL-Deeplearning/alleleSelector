@@ -1,5 +1,4 @@
-from pyfaidx import Fasta
-
+from pysam import FastaFile
 """
 This class handles fasta reference files, ensuring that the sequence is not a terminal 'N' and that the end of the
 sequence has not been reached
@@ -19,10 +18,24 @@ class FastaHandler:
         self.fasta_file_path = reference_file_path
 
         try:
-            self.fasta = Fasta(self.fasta_file_path, as_raw=True, sequence_always_upper=True)
+            self.fasta = FastaFile(self.fasta_file_path)
         except:
-            raise IOError("BAM FILE READ ERROR")
+            raise IOError("FASTA FILE READ ERROR")
 
     def get_sequence(self, chromosome_name, start, stop):
-        return self.fasta.get_seq(name=chromosome_name, start=start+1, end=stop+1)  # must be 1-based
+        """
+        Return the sequence of a query region
+        :param chromosome_name: Chromosome name
+        :param start: Region start
+        :param stop: Region end
+        :return: Sequence of the region
+        """
+        return self.fasta.fetch(region=chromosome_name, start=start, end=stop).upper()
 
+    def get_chr_sequence_length(self, chromosome_name):
+        """
+        Get sequence length of a chromosome. This is used for selecting windows of parallel processing.
+        :param chromosome_name: Chromosome name
+        :return: Length of the chromosome reference sequence
+        """
+        return self.fasta.get_reference_length(chromosome_name)
