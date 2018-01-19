@@ -1,7 +1,7 @@
 import pysam
 
 """
-This class handles bam files using pysam API. Two methods mostly handles the BAM interaction:
+This class handles bam files using pysam API.
 """
 
 
@@ -21,5 +21,12 @@ class BamHandler:
             raise IOError("BAM FILE READ ERROR")
 
     def get_reads(self, chromosome_name, start, stop):
+        """
+        Return reads that map to a given site
+        :param chromosome_name: Chromosome name. Ex: chr3
+        :param start: Site start in the chromosome
+        :param stop: Site end in the chromosome
+        :return: Reads that align to that site
+        """
         return self.bamFile.fetch(contig=chromosome_name, start=start, end=stop)
 

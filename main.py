@@ -1,4 +1,3 @@
-import modules.BamHandler as bam_processor
 import argparse
 import sys
 import pysam
