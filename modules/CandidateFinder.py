@@ -1,13 +1,13 @@
 from collections import defaultdict
 
 """
-CandidateFinder finds possible positions based on mismatches we see in reads.
+CandidateFinder finds possible positions based on edits we see in reads.
 It parses through each read of a site and finds possible candidate positions.
 
 Dictionaries it updates:
 - candidate_by_read:    records at each position what reads had mismatches  {int -> list}
 - coverage:             records coverage of a position                      {int -> int}
-- mismatch_count:       records number of mismatches in a position          {int -> int}
+- edit_count:           records number of mismatches in a position          {int -> int}
 
 Other data structures:
 - candidate_positions (set):    set of positions that of potential candidate variants
@@ -42,14 +42,14 @@ class CandidateFinder:
         # the store which reads are creating candidates in that position
         self.candidates_by_read = defaultdict(list)
         self.coverage = defaultdict(int)
-        self.mismatch_count = defaultdict(int)
+        self.edit_count = defaultdict(int)
         self.candidate_positions = set()
         # all merged windows
         self.merged_windows = []
 
     def print_positions(self):
         for pos in sorted(self.candidate_positions):
-            print(pos, self.mismatch_count[pos], self.coverage[pos])
+            print(pos, self.edit_count[pos], self.coverage[pos])
 
     def print_windows(self):
         print(len(self.merged_windows))
@@ -122,7 +122,7 @@ class CandidateFinder:
         for i in range(len(read_sequence)):
             self.coverage[alignment_position+i] += 1
             if read_sequence[i] != ref_sequence[i]:
-                self.mismatch_count[alignment_position+i] += 1
+                self.edit_count[alignment_position+i] += 1
                 self.candidates_by_read[alignment_position+i].append(read_name)
                 yield alignment_position + i
 
@@ -140,7 +140,7 @@ class CandidateFinder:
         start = alignment_position-1
         stop = alignment_position + length + 1
         for i in range(start, stop):
-            self.mismatch_count[i] += 1
+            self.edit_count[i] += 1
             self.candidates_by_read[i].append(read_name)
             yield i
             yield i-1
@@ -155,7 +155,7 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        self.mismatch_count[alignment_position] += 1
+        self.edit_count[alignment_position] += 1
         self.candidates_by_read[alignment_position].append(read_name)
         yield alignment_position
 
