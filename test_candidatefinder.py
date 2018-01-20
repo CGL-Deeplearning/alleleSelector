@@ -97,21 +97,27 @@ class View:
         smry.write("TOTAL POSITIONS IN VCF: " + str(total_positions_in_vcf) + '\n')
         smry.write("TOTAL POSITIONS NOT PICKED: " + str(not_found_count) + '\n')
 
-    def do_parallel(self, vcf_file_path, max_threads=5):
-        """
-        Split the chromosome into different ranges for parallel processing.
-        :param max_threads: Maximum number of threads to create
-        :return:
-        """
-        # entire length of chromosome
-        whole_length = self.fasta_handler.get_chr_sequence_length(self.chromosome_name)
-        # expected length of each segment
-        each_segment_length = int(math.ceil(whole_length / max_threads))
 
-        for i in range(max_threads):
-            # parse window of the segment. Use a 1000 overlap for corner cases.
-            p = Process(target=self.test, args=(vcf_file_path, i*each_segment_length, (i+1)*each_segment_length + 1000))
-            p.start()
+def do_parallel(chr_name, bam_file, ref_file, vcf_file, max_threads=5):
+    """
+    Split the chromosome into different ranges for parallel processing.
+    :param max_threads: Maximum number of threads to create
+    :return:
+    """
+    # entire length of chromosome
+    fasta_handler = FastaHandler(ref_file)
+    whole_length = fasta_handler.get_chr_sequence_length(chr_name)
+
+    # expected length of each segment
+    each_segment_length = int(math.ceil(whole_length / max_threads))
+
+    for i in range(max_threads):
+        # parse window of the segment. Use a 1000 overlap for corner cases.
+        view = View(chromosome_name=chr_name,
+                    bam_file_path=bam_file,
+                    reference_file_path=ref_file)
+        p = Process(target=view.test, args=(vcf_file, i*each_segment_length, (i+1)*each_segment_length + 1000))
+        p.start()
 
 if __name__ == '__main__':
     '''
@@ -149,15 +155,22 @@ if __name__ == '__main__':
         default=5,
         help="Number of maximum threads for this region."
     )
+    parser.add_argument(
+        "--test",
+        type=bool,
+        default=False,
+        help="If true then a dry test is run."
+    )
 
     FLAGS, unparsed = parser.parse_known_args()
 
-    view = View(chromosome_name=FLAGS.chromosome_name,
-                bam_file_path=FLAGS.bam,
-                reference_file_path=FLAGS.ref)
-
-    # view.do_parallel(FLAGS.vcf, max_threads=FLAGS.max_threads)
-    view.test(FLAGS.vcf, start_position=100000, end_position=400000)
+    if FLAGS.test is True:
+        view = View(chromosome_name=FLAGS.chromosome_name,
+                    bam_file_path=FLAGS.bam,
+                    reference_file_path=FLAGS.ref)
+        view.test(FLAGS.vcf, start_position=100000, end_position=400000)
+    else:
+        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.max_threads)
 
 # usage example:
 # python3 main.py --bam /Users/saureous/data/chr3_200k.bam --ref /Users/saureous/data/chr3.fa --chromosome_name chr3 --window_size 1000
