@@ -156,8 +156,8 @@ if __name__ == '__main__':
                 bam_file_path=FLAGS.bam,
                 reference_file_path=FLAGS.ref)
 
-    view.do_parallel(FLAGS.vcf, max_threads=FLAGS.max_threads)
-    # view.test(FLAGS.vcf, start_position=100000, end_position=400000)
+    # view.do_parallel(FLAGS.vcf, max_threads=FLAGS.max_threads)
+    view.test(FLAGS.vcf, start_position=100000, end_position=400000)
 
 # usage example:
 # python3 main.py --bam /Users/saureous/data/chr3_200k.bam --ref /Users/saureous/data/chr3.fa --chromosome_name chr3 --window_size 1000
