@@ -89,7 +89,7 @@ class View:
                 for i in range(rec_start, rec_end):
                     total_positions_in_vcf += 1
                     if self.test_positions[i] != 1:
-                        smry.write(str(not_found_count) + '\n')
+                        smry.write(str(i) + '\n')
                         not_found_count += 1
 
         smry.write("TIME ELAPSED: " + str(end_time - start_time) + '\n')
