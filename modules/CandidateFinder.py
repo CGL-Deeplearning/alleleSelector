@@ -17,8 +17,9 @@ Merged_windows is constructed from candidate_positions. If two positions fall wi
 MERGE_WINDOW_DISTANCE we merge them in a single window.
 """
 DEFAULT_MIN_MAP_QUALITY = 10
-MERGE_WINDOW_DISTANCE = 10
-MERGE_WINDOW_OFFSET = 2
+MERGE_WINDOW_DISTANCE = 1
+MERGE_WINDOW_OFFSET = 1
+MIN_MISMATCH_THRESHOLD = 5
 
 class CandidateFinder:
     """
@@ -136,11 +137,13 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        self.coverage[alignment_position] += 1
         start = alignment_position-1
         stop = alignment_position + length + 1
         for i in range(start, stop):
             self.mismatch_count[i] += 1
+            self.mismatch_count[i-1] += 1
+            self.coverage[i] += 1
+            self.coverage[i-1] += 1
             self.candidates_by_read[i].append(read_name)
             yield i
             yield i-1
@@ -213,7 +216,8 @@ class CandidateFinder:
 
             for pos in candidate_positions:
                 if self.window_start_position <= pos <= self.window_end_position:
-                    yield pos
+                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD:
+                        yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
         """

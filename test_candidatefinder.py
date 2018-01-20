@@ -1,11 +1,13 @@
 import argparse
 import math
+import os
 import time
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from  modules.vcf_handler import VCFFileProcessor
 from collections import defaultdict
+from multiprocessing import Process
 
 """
 alignmentPolish finds possible variant sites in given bam file.
@@ -45,38 +47,57 @@ class View:
                                            chromosome_name=self.chromosome_name,
                                            window_start_position=start_position,
                                            window_end_position=end_position)
+
         # parse reads to find candidate positions
         candidate_finder.parse_reads(reads=reads)
+        # print(sorted(candidate_finder.candidate_positions))
         # merge candidate positions to windows
         candidate_finder.merge_positions()
+        # print(candidate_finder.merged_windows)
         # print the windows we got
         return candidate_finder.merged_windows
 
     def test(self, vcf_file_path, start_position, end_position):
+        if not os.path.exists("tmp/"):
+            os.mkdir("tmp/")
+        smry = open("tmp/" + "summary" + '_' + self.chromosome_name + '_' + str(start_position) + '_' + str(end_position) + ".csv", 'w')
+
+        start_time = time.time()
         merged_windows = self.parse_window(start_position=start_position, end_position=end_position)
+        end_time = time.time()
+
+        total_positions = 0
         for windows in merged_windows:
             start_pos = windows[1]
             end_pos = windows[2]
             for pos in range(start_pos, end_pos+1):
                 self.test_positions[pos] = 1
+                total_positions += 1
 
         vcf_handler = VCFFileProcessor(vcf_file_path)
         vcf_handler.populate_dictionary(self.chromosome_name, start_position, end_position, hom_filter=True)
 
         # get the vcf dictionary of that region
         vcf_dict = vcf_handler.get_variant_dictionary()
+        not_found_count = 0
+        total_positions_in_vcf = 0
         for pos in vcf_dict.keys():
             for rec in vcf_dict[pos]:
                 rec_len = len(rec.ref)
                 rec_start = pos
                 rec_end = rec_start + rec_len
                 for i in range(rec_start, rec_end):
+                    total_positions_in_vcf += 1
                     if self.test_positions[i] != 1:
-                        print(i)
+                        smry.write(str(not_found_count) + '\n')
+                        not_found_count += 1
 
+        smry.write("TIME ELAPSED: " + str(end_time - start_time) + '\n')
+        smry.write("TOTAL POSITIONS: " + str(total_positions)  +'\n')
+        smry.write("TOTAL POSITIONS IN VCF: " + str(total_positions_in_vcf) + '\n')
+        smry.write("TOTAL POSITIONS NOT PICKED: " + str(not_found_count) + '\n')
 
-
-    def do_parallel(self, max_threads=5):
+    def do_parallel(self, vcf_file_path, max_threads=5):
         """
         Split the chromosome into different ranges for parallel processing.
         :param max_threads: Maximum number of threads to create
@@ -88,16 +109,9 @@ class View:
         each_segment_length = int(math.ceil(whole_length / max_threads))
 
         for i in range(max_threads):
-            print(i*each_segment_length, (i+1)*each_segment_length + 1000)
-
-            start_time = time.time()
-
             # parse window of the segment. Use a 1000 overlap for corner cases.
-            self.parse_window(i*each_segment_length, (i+1)*each_segment_length + 1000)
-
-            end_time = time.time()
-            print("Total time: ", end_time-start_time)
-            exit()
+            p = Process(target=self.test, args=(vcf_file_path, i*each_segment_length, (i+1)*each_segment_length + 1000))
+            p.start()
 
 if __name__ == '__main__':
     '''
@@ -142,8 +156,8 @@ if __name__ == '__main__':
                 bam_file_path=FLAGS.bam,
                 reference_file_path=FLAGS.ref)
 
-    # view.do_parallel(max_threads=FLAGS.max_threads)
-    view.test(FLAGS.vcf, start_position=100000, end_position=400000)
+    view.do_parallel(FLAGS.vcf, max_threads=FLAGS.max_threads)
+    # view.test(FLAGS.vcf, start_position=100000, end_position=400000)
 
 # usage example:
 # python3 main.py --bam /Users/saureous/data/chr3_200k.bam --ref /Users/saureous/data/chr3.fa --chromosome_name chr3 --window_size 1000
