@@ -26,7 +26,7 @@ Window: A window in genomic region where there can be multiple alleles
 
 A region can have multiple windows and each window belongs to a region.
 """
-DEBUG_PRINT_WINDOWS = True
+DEBUG_PRINT_WINDOWS = False
 DEBUG_PRINT_CANDIDATES = False
 
 
