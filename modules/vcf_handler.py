@@ -99,7 +99,7 @@ class VariantRecord:
         Print a record
         :return: String to print
         """
-        return_str = str(self.pos) + '\t' + str(int(self.qual)) + '\t' + str(self.ref) + '\t' + str(self.alt) +\
+        return_str = str(self.pos) + '\t' + str(int(self.qual)) + '\t' + str(self.ref) + '\t' + str(self.alt) + \
                      '\t' + str(self.type) + '\t' + str(self.genotype_class)
         return return_str
 
