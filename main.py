@@ -156,13 +156,13 @@ class View:
         self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
 
 
-def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads=5):
+def do_parallel(chr_name, bam_file, ref_file, json_out, output_dir, max_threads=5):
     """
     Split chromosome in different ranges for parallel processing
     :param chr_name: Chromosome name
     :param bam_file: Bam file path
     :param ref_file: Reference file path
-    :param vcf_file: VCF file path
+    :param output_dir: Directory for saving output
     :param json_out: JSON out flag
     :param max_threads: Maximum number of threads
     :return:
@@ -183,7 +183,7 @@ def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, ma
                     )
         start_position = i*each_segment_length
         end_position = (i+1) * each_segment_length + 1000
-        p = Process(target=view.parse_region, args=(vcf_file, start_position, end_position, json_out))
+        p = Process(target=view.parse_region, args=(start_position, end_position, json_out))
         p.start()
 
 
@@ -255,4 +255,4 @@ if __name__ == '__main__':
                     output_file_path=FLAGS.output_dir)
         view.test(FLAGS.json)
     else:
-        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.json, FLAGS.max_threads)
+        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.json, FLAGS.output_dir, FLAGS.max_threads)
