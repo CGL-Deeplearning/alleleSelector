@@ -246,6 +246,10 @@ class AlleleFinder:
         Generate a list of candidates for the window
         :return: A list of candidate alleles for that window
         """
+        # if we are at the end of chromosome or in a part where there's no read aligned
+        if self.window_start not in self.reads_aligned_to_pos:
+            return []
+
         reads = self.reads_aligned_to_pos[self.window_start]
         candidate_list = AlleleCandidateList(self.chromosome_name, self.window_start, self.window_end,
                                              self.reference_sequence)
