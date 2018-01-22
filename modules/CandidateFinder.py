@@ -45,6 +45,7 @@ class CandidateFinder:
         # the store which reads are creating candidates in that position
         self.candidates_by_read = defaultdict(list)
         self.coverage = defaultdict(int)
+        self.mismatch_count = defaultdict(int)
         self.edit_count = defaultdict(int)
         self.candidate_positions = set()
         # all merged windows
