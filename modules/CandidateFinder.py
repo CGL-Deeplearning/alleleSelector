@@ -126,6 +126,7 @@ class CandidateFinder:
         for i in range(len(read_sequence)):
             self.coverage[alignment_position+i] += 1
             if read_sequence[i] != ref_sequence[i]:
+                self.mismatch_count[alignment_position+i] += 1
                 self.edit_count[alignment_position+i] += 1
                 self.candidates_by_read[alignment_position+i].append(read_name)
                 yield alignment_position + i
@@ -160,6 +161,7 @@ class CandidateFinder:
         """
         self.edit_count[alignment_position] += 1
         self.candidates_by_read[alignment_position].append(read_name)
+        self.mismatch_count[alignment_position] += 1
         yield alignment_position
 
     def parse_reads(self, reads):
