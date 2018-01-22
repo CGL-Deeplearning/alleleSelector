@@ -20,6 +20,18 @@ class BamHandler:
         except:
             raise IOError("BAM FILE READ ERROR")
 
+    def get_pileupcolumns_aligned_to_a_region(self, chromosome_name, start, end):
+        """
+        Return a AlignmentFile.pileup object given a site
+        :param contig: Contig [ex. chr3]
+        :param pos: Position [ex 100001]
+        :return: pysam.AlignmentFile.pileup object
+        """
+        # get pileup columns
+        pileup_columns = self.bamFile.pileup(chromosome_name, start, end, truncate=True)
+        # return pileup columns
+        return pileup_columns
+
     def get_reads(self, chromosome_name, start, stop):
         """
         Return reads that map to a given site

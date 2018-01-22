@@ -1,0 +1,286 @@
+"""
+Finds allele in a given window. The window is a candidate window where a variant is present.
+
+- CandidateInformation:
+    - Information of a candidate allele we need to save.
+    - When we find a candidate allele we save:
+        - read_id, allele_sequence, map_quality, base_quality, read_direction
+
+- AlleleCandidateList:
+    - Stores all candidate alleles present in that window
+
+- AlleleFinder
+    - Goes through all the reads and creates alleles that are possible candidates
+"""
+
+
+class CandidateInformation:
+    """
+    Creates a structure of candidate allele information
+
+    For each candidate allele we save these information:
+    - read_id: which read is proposing this candidate
+    - allele_sequence: sequence of the allele
+    - map_quality: map quality of the read
+    - base_qualities: base qualities of each base in the allele sequence
+    - read_direction: if the read is reverse this is true
+    """
+    def __init__(self, allele_sequence, map_quality, base_qualities, read_id, read_direction):
+        """
+        Initiate a candidate object
+        :param allele_sequence: sequence of the allele
+        :param map_quality: map quality of the read
+        :param base_qualities: base qualities of each base in the allele sequence
+        :param read_id: which read is proposing this candidate
+        :param read_direction: if the read is reverse this is true
+        """
+        self.read_id = read_id
+        self.allele_sequence = allele_sequence
+        self.map_quality = map_quality
+        self.base_qualities = base_qualities
+        self.read_direction = read_direction
+
+    def __str__(self):
+        """
+        Print the candidate
+        :return: A string that contains the values of the attribute
+        """
+        print_str = str(self.read_id) + "\n" + str(self.allele_sequence) + " " \
+                    + str(self.map_quality) + " " + str(self.base_qualities)
+        return print_str
+
+    def reprJSON(self):
+        """
+        Report all attributes of this object as a dictionary that can be saved as a JSON
+        :return: A dictionary with key value to be saved in json format
+        """
+        return dict(read_id=self.read_id, allele_sequence=self.allele_sequence, map_quality=self.map_quality,
+                    base_qualities=self.base_qualities, read_direction=self.read_direction)
+
+
+class AlleleCandidateList:
+    """
+    Stores all candidate alleles present in that window
+    """
+    def __init__(self, chromosome_name, window_start, window_end, reference_sequence):
+        """
+        Initiate the list for this window
+        :param chromosome_name: Name of the chromosome where the window is
+        :param window_start: Position where window starts
+        :param window_end: Position where window ends
+        :param reference_sequence: Reference sequence at that window site
+        """
+        self.chromosome_name = chromosome_name
+        self.window_start = window_start
+        self.window_end = window_end
+        self.reference_sequence = reference_sequence
+
+        self.candidate_alleles = []
+
+    def add_candidate_to_list(self, candidate_object):
+        """
+        Add a candidate to the list
+        :param candidate_object: A CandidateInformation object
+        :return:
+        """
+        self.candidate_alleles.append(candidate_object)
+
+    def print_all_candidates(self):
+        """
+        Print all the candidates in the list
+        :return:
+        """
+        print(self.chromosome_name, self.window_start, self.window_end)
+        print(self.reference_sequence)
+
+        for candidate in self.candidate_alleles:
+            print(candidate)
+
+    def reprJSON(self):
+        """
+        Report all attributes of this object as a dictionary that can be saved as a JSON
+        :return: A dictionary with key value to be saved in json format
+        """
+        return dict(chromosome_name=self.chromosome_name, window_start=self.window_start, window_end=self.window_end,
+                    reference_sequence=self.reference_sequence, candidate_alleles=self.candidate_alleles)
+
+
+class AlleleFinder:
+    """
+    Find alleles in a given window.
+    """
+    def __init__(self, chromosome_name, window_start, window_end, column_pileups, reference_sequence):
+        """
+        Initialize AlleleFinder object
+        :param chromosome_name: Name of chromosome
+        :param window_start: Start position of the window
+        :param window_end: End position of the window
+        :param column_pileups: All column pileups that belong to the window
+        :param reference_sequence: Reference sequence of the window
+        """
+        self.chromosome_name = chromosome_name
+        self.window_start = window_start
+        self.window_end = window_end
+        self.column_pileups = column_pileups
+
+        # [genomic_position] = [max_insert_length]
+        self.insert_length_dictionary = {}
+        # [read_id] = {{genomic_position}->base}
+        self.read_dictionary = {}
+        # [read_id] = {{genomic_position}->insert_bases}
+        self.read_insert_dictionary = {}  # used
+        # List of Read ids in a genomic position
+        self.reads_aligned_to_pos = {}
+        self.reference_sequence = reference_sequence
+
+    @staticmethod
+    def get_attributes_to_save_insert(pileupcolumn, pileupread):
+        """
+        If position has insert then return attributes to be saved
+        :param pileupcolumn: Pileupcolumn of that position
+        :param pileupread: Read that has the insert
+        :return: set of attributes to save
+        """
+        insert_start = pileupread.query_position + 1
+        insert_end = insert_start + pileupread.indel
+
+        return pileupcolumn.pos, \
+               pileupread.alignment.query_name, \
+               pileupread.alignment.query_sequence[insert_start:insert_end], \
+               pileupread.alignment.query_qualities[insert_start:insert_end], \
+               pileupread.alignment.mapping_quality, \
+               pileupread.alignment.is_reverse
+
+    @staticmethod
+    def get_attributes_to_save(pileupcolumn, pileupread):
+        """
+        If position has insert then return attributes to be saved
+        :param pileupcolumn: Pileupcolumn of that position
+        :param pileupread: Read that has the insert
+        :return: set of attributes to save
+        """
+        if pileupread.is_del:
+            return pileupcolumn.pos, \
+                   pileupread.alignment.query_name, \
+                   '*', \
+                   0, \
+                   pileupread.alignment.mapping_quality, \
+                   pileupread.alignment.is_reverse
+        else:
+            return pileupcolumn.pos, \
+                   pileupread.alignment.query_name, \
+                   pileupread.alignment.query_sequence[pileupread.query_position], \
+                   pileupread.alignment.query_qualities[pileupread.query_position], \
+                   pileupread.alignment.mapping_quality, \
+                   pileupread.alignment.is_reverse
+
+    def initialize_dictionaries(self, genomic_position, read_id, is_insert):
+        """
+        Initialize all the dictionaries for a specific position
+        :param genomic_position: Genomic position of interest
+        :param read_id: Read id for which dictionaries should be initialized
+        :param is_insert: If the position is an insert
+        :return:
+        """
+        if genomic_position not in self.reads_aligned_to_pos:
+            self.reads_aligned_to_pos[genomic_position] = []
+
+        if read_id not in self.read_dictionary:
+            self.read_dictionary[read_id] = {}
+            self.read_dictionary[read_id][genomic_position] =''
+
+        if is_insert:
+            if genomic_position not in self.insert_length_dictionary:
+                self.insert_length_dictionary[genomic_position] = 0
+            if read_id not in self.read_insert_dictionary:
+                self.read_insert_dictionary[read_id] = {}
+                self.read_insert_dictionary[read_id][genomic_position] =''
+
+    def save_info_of_a_position(self, genomic_position, read_id, base, base_qual, map_qual, is_rev, is_in):
+        """
+        Given the attributes of a base at a position
+        :param genomic_position: Genomic position
+        :param read_id: Read id of a read
+        :param base: Base at the position
+        :param base_qual: Base quality
+        :param map_qual: Map quality
+        :param is_rev: If read is reversed
+        :param is_in: If position has insert
+        :return:
+        """
+        self.initialize_dictionaries(genomic_position, read_id, is_in)
+
+        if is_in is False:
+            self.read_dictionary[read_id][genomic_position] = (base, base_qual, map_qual, is_rev)
+        else:
+            self.read_insert_dictionary[read_id][genomic_position] = (base, base_qual, map_qual, is_rev)
+            self.insert_length_dictionary[genomic_position] = max(self.insert_length_dictionary[genomic_position],
+                                                                  len(base))
+
+    def generate_base_dictionaries(self):
+        """
+        Go through all the positions and update base and insert dictionary
+        :return:
+        """
+        # in each column of pileup columns
+        for pileupcolumn in self.column_pileups:
+            # initialize the read aligned to position list
+            self.reads_aligned_to_pos[pileupcolumn.pos] = []
+            # iterate through each read in the pileup
+            for pileupread in pileupcolumn.pileups:
+                # add read to position
+                self.reads_aligned_to_pos[pileupcolumn.pos].append(pileupread.alignment.query_name)
+                # if there is an insert
+                if pileupread.indel > 0:
+                    gen_pos, read_id, base, base_qual, map_qual, is_rev = \
+                        self.get_attributes_to_save_insert(pileupcolumn, pileupread)
+                    self.save_info_of_a_position(gen_pos, read_id, base, base_qual, map_qual, is_rev, is_in=True)
+
+                # or just take care of the base
+                gen_pos, read_id, base, base_qual, map_qual, is_rev = \
+                    self.get_attributes_to_save(pileupcolumn, pileupread)
+                self.save_info_of_a_position(gen_pos, read_id, base, base_qual, map_qual, is_rev, is_in=False)
+
+    def generate_candidate_allele_list(self):
+        """
+        Generate a list of candidates for the window
+        :return: A list of candidate alleles for that window
+        """
+        reads = self.reads_aligned_to_pos[self.window_start]
+        candidate_list = AlleleCandidateList(self.chromosome_name, self.window_start, self.window_end,
+                                             self.reference_sequence)
+        insert_case = False
+        for read in reads:
+
+            candidate_allele = ''
+            candidate_base_quality = []
+            candidate_map_quality = 60
+            candidate_read_is_rev = False
+            read_covers_whole_window = True
+            for pos in range(self.window_start, self.window_end+1):
+                if read in self.read_dictionary and pos in self.read_dictionary[read]:
+                    base, base_quality, map_quality, orientation = self.read_dictionary[read][pos]
+                    candidate_allele += base
+                    candidate_base_quality.append(base_quality)
+                    candidate_map_quality = map_quality
+                    candidate_read_is_rev = orientation
+                else:
+                    read_covers_whole_window = False
+                    break
+
+                if read in self.read_insert_dictionary and pos in self.read_insert_dictionary[read]:
+                    insert_case = True
+                    base, base_quality, map_quality, orientation = self.read_insert_dictionary[read][pos]
+                    # print(base, base_quality[0], map_quality, orientation)
+                    candidate_allele += base
+                    candidate_base_quality.extend(base_quality)
+                    candidate_map_quality = map_quality
+                    candidate_read_is_rev = orientation
+
+            if read_covers_whole_window:
+                candidate_object = CandidateInformation(candidate_allele, candidate_map_quality, candidate_base_quality,
+                                                        read, candidate_read_is_rev)
+                candidate_list.add_candidate_to_list(candidate_object)
+
+        return candidate_list
+

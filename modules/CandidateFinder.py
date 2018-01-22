@@ -16,25 +16,28 @@ Other data structures:
 Merged_windows is constructed from candidate_positions. If two positions fall within
 MERGE_WINDOW_DISTANCE we merge them in a single window.
 """
-DEFAULT_MIN_MAP_QUALITY = 10
-MERGE_WINDOW_DISTANCE = 10
-MERGE_WINDOW_OFFSET = 2
+DEFAULT_MIN_MAP_QUALITY = 5
+MERGE_WINDOW_DISTANCE = 1
+MERGE_WINDOW_OFFSET = 1
+MIN_MISMATCH_THRESHOLD = 5
+
 
 class CandidateFinder:
     """
     Given reads that align to a site and a pointer to the reference fasta file handler,
     candidate finder finds possible variant candidates_by_read of that site.
     """
-    def __init__(self, reads, fasta_handler, chromosome_name, window_start_position, window_end_position):
+    def __init__(self, reads, fasta_handler, chromosome_name, region_start_position, region_end_position):
         """
         Initialize a candidate finder object.
         :param reads: Reads that align to the site
         :param fasta_handler: Reference sequence handler
         :param chromosome_name: Chromosome name
-        :param window_start_position: Start site of the window
+        :param region_start_position: Start position of the region
+        :param region_end_position: End position of the region
         """
-        self.window_start_position = window_start_position
-        self.window_end_position = window_end_position
+        self.region_start_position = region_start_position
+        self.region_end_position = region_end_position
         self.chromosome_name = chromosome_name
         self.fasta_handler = fasta_handler
         self.reads = reads
@@ -52,9 +55,12 @@ class CandidateFinder:
             print(pos, self.edit_count[pos], self.coverage[pos])
 
     def print_windows(self):
-        print(len(self.merged_windows))
+        print('Total windows: ', len(self.merged_windows))
         for window in self.merged_windows:
             print(window[0], window[1], window[2])
+
+    def get_candidate_windows(self):
+        return self.merged_windows
 
     @staticmethod
     def get_read_stop_position(read):
@@ -106,8 +112,6 @@ class CandidateFinder:
         if start_pos != -1:
             self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
 
-
-
     def parse_match(self, alignment_position, read_sequence, ref_sequence, read_name):
         """
         Process a cigar operation that is a match
@@ -136,14 +140,13 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        self.coverage[alignment_position] += 1
-        start = alignment_position-1
-        stop = alignment_position + length + 1
+        start = alignment_position
+        stop = alignment_position + length
         for i in range(start, stop):
-            self.edit_count[i] += 1
+            self.mismatch_count[i] += 1
+            self.coverage[i] += 1
             self.candidates_by_read[i].append(read_name)
             yield i
-            yield i-1
 
     def parse_insert(self, alignment_position, length, read_name):
         """
@@ -212,8 +215,9 @@ class CandidateFinder:
             ref_index += ref_index_increment
 
             for pos in candidate_positions:
-                if self.window_start_position <= pos <= self.window_end_position:
-                    yield pos
+                if self.region_start_position <= pos <= self.region_end_position:
+                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD:
+                        yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
         """
