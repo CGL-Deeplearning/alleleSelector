@@ -345,8 +345,6 @@ class AlleleSelector:
         site["alt2_sequence"] = alt2_sequence
         site["genotype"] = genotype
 
-        print(site)
-
         return allele, site, is_multi_vcf_site
 
     def get_merged_variants_for_site(self, variant, window_start, window_stop):
