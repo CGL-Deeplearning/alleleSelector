@@ -16,10 +16,10 @@ Other data structures:
 Merged_windows is constructed from candidate_positions. If two positions fall within
 MERGE_WINDOW_DISTANCE we merge them in a single window.
 """
-DEFAULT_MIN_MAP_QUALITY = 5
-MERGE_WINDOW_DISTANCE = 1
-MERGE_WINDOW_OFFSET = 1
-MIN_MISMATCH_THRESHOLD = 5
+DEFAULT_MIN_MAP_QUALITY = 10
+MERGE_WINDOW_DISTANCE = 0
+MERGE_WINDOW_OFFSET = 0
+MIN_MISMATCH_THRESHOLD = 2
 
 
 class CandidateFinder:
@@ -113,7 +113,7 @@ class CandidateFinder:
         if start_pos != -1:
             self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
 
-    def parse_match(self, alignment_position, read_sequence, ref_sequence, read_name):
+    def parse_match(self, alignment_position, length, read_sequence, ref_sequence, read_name):
         """
         Process a cigar operation that is a match
         :param alignment_position: Position where this match happened
@@ -124,13 +124,16 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        for i in range(len(read_sequence)):
-            self.coverage[alignment_position+i] += 1
-            if read_sequence[i] != ref_sequence[i]:
-                self.mismatch_count[alignment_position+i] += 1
-                self.edit_count[alignment_position+i] += 1
-                self.candidates_by_read[alignment_position+i].append(read_name)
-                yield alignment_position + i
+        offset = 0
+        start = alignment_position
+        stop = start + length
+        for i in range(start, stop):
+            self.coverage[i] += 1
+            if read_sequence[i-alignment_position] != ref_sequence[i-alignment_position]:
+                self.mismatch_count[i+offset] += 1
+                self.edit_count[i+offset] += 1
+                self.candidates_by_read[i+offset].append(read_name)
+                yield i+offset
 
     def parse_delete(self, alignment_position, length, read_name):
         """
@@ -142,8 +145,9 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        start = alignment_position
-        stop = alignment_position + length
+        start = alignment_position + 1 # actual delete position starts one after the anchor
+        stop = start + length
+        # print('Delete', start, stop)
         for i in range(start, stop):
             self.mismatch_count[i] += 1
             self.coverage[i] += 1
@@ -196,10 +200,10 @@ class CandidateFinder:
         # ref_index: index of reference sequence
         read_index = 0
         ref_index = 0
+
         for cigar in cigar_tuples:
             cigar_code = cigar[0]
             length = cigar[1]
-
             # get the sequence segments that are effected by this operation
             ref_sequence_segment = ref_sequence[ref_index:ref_index+length]
             read_sequence_segment = read_sequence[read_index:read_index+length]
@@ -254,36 +258,40 @@ class CandidateFinder:
         if cigar_code == 0:
             # match
             candidate_positions.update(self.parse_match(alignment_position=alignment_position,
+                                                        length=length,
                                                         read_sequence=read_sequence,
                                                         ref_sequence=ref_sequence,
                                                         read_name=read_name))
         elif cigar_code == 1:
             # insert
-            candidate_positions.update(self.parse_insert(alignment_position=alignment_position,
+            # alignment position is where the next alignment starts, for insert and delete this
+            # position should be the anchor point hence we use a -1 to refer to the anchor point
+            candidate_positions.update(self.parse_insert(alignment_position=alignment_position-1,
                                                          length=length,
                                                          read_name=read_name))
             ref_index_increment = 0
-        elif cigar_code == 2:
-            # delete
-            candidate_positions.update(self.parse_delete(alignment_position=alignment_position,
+        elif cigar_code == 2 or cigar_code == 3:
+            # delete or ref_skip
+            # alignment position is where the next alignment starts, for insert and delete this
+            # position should be the anchor point hence we use a -1 to refer to the anchor point
+            candidate_positions.update(self.parse_delete(alignment_position=alignment_position-1,
                                                          length=length,
                                                          read_name=read_name))
             read_index_increment = 0
-        elif cigar_code == 3:
-            # ref skip
-            ref_index_increment = 0
-
         elif cigar_code == 4:
             # soft clip
             ref_index_increment = 0
+            # print("CIGAR CODE ERROR SC")
         elif cigar_code == 5:
             # hard clip
             ref_index_increment = 0
             read_index_increment = 0
+            # print("CIGAR CODE ERROR HC")
         elif cigar_code == 6:
             # pad
             ref_index_increment = 0
             read_index_increment = 0
+            # print("CIGAR CODE ERROR PAD")
         else:
             raise("INVALID CIGAR CODE: %s" % cigar_code)
 

@@ -40,6 +40,7 @@ class CandidateInformation:
         self.base_qualities = base_qualities
         self.read_direction = read_direction
 
+
     def __str__(self):
         """
         Print the candidate
@@ -76,6 +77,8 @@ class AlleleCandidateList:
         self.reference_sequence = reference_sequence
 
         self.candidate_alleles = []
+        self.genotype = None
+        self.genotype_reported = False
 
     def add_candidate_to_list(self, candidate_object):
         """
@@ -271,7 +274,6 @@ class AlleleFinder:
                 if read in self.read_insert_dictionary and pos in self.read_insert_dictionary[read]:
                     insert_case = True
                     base, base_quality, map_quality, orientation = self.read_insert_dictionary[read][pos]
-                    # print(base, base_quality[0], map_quality, orientation)
                     candidate_allele += base
                     candidate_base_quality.extend(base_quality)
                     candidate_map_quality = map_quality

@@ -1,5 +1,6 @@
 import json
 
+
 class AlleleFileHandler:
     '''
     Opens a JSON file containing a dictionary with key = sites and value = list of observed alleles, each with relevant

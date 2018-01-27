@@ -7,6 +7,7 @@ from os.path import isfile, join, exists
 import argparse
 import json
 
+
 class ComplexEncoder(json.JSONEncoder):
     """
     JSON encoder for class attributes
@@ -16,6 +17,7 @@ class ComplexEncoder(json.JSONEncoder):
             return obj.reprJSON()
         else:
             return json.JSONEncoder.default(self, obj)
+
 
 class View:
     '''
@@ -72,6 +74,9 @@ class View:
         labeled_sites = allele_selector.get_labeled_candidates(variants=variants, candidate_sites=candidate_sites)
 
         return labeled_sites
+
+    def geenerate_labeled_sites(self, start_position, end_position, json_out):
+        pass
 
     def test_json_directory(self, json_directory_path):
         '''

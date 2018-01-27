@@ -25,6 +25,7 @@ class VCFRecord:
         :param rec: A VCF record
         """
         self.rec_pos = rec.pos
+        self.rec_end = rec.stop
         self.rec_qual = rec.qual if rec.qual else 10
         self.rec_genotype = self._get_record_genotype(rec)
         # FILTER field of VCF file
