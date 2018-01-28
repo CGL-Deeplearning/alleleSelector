@@ -16,7 +16,7 @@ Other data structures:
 Merged_windows is constructed from candidate_positions. If two positions fall within
 MERGE_WINDOW_DISTANCE we merge them in a single window.
 """
-DEFAULT_MIN_MAP_QUALITY = 10
+DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
 MIN_MISMATCH_THRESHOLD = 2

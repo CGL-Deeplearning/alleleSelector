@@ -204,9 +204,10 @@ class View:
             self.write_json(start_position, end_position, all_candidate_lists)
 
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
-        for sites in labeled_sites:
-            print(sites)
+        # for sites in labeled_sites:
+        #     print(sites)
         print(len(labeled_sites))
+
         # print(labeled_sites)
         # 121335  877     A       C       Het     SNP
 

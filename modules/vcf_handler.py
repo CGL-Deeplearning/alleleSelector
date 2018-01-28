@@ -40,10 +40,12 @@ class VCFRecord:
             # If both are 0 or filter not PASS then rec_not_hom is false
             self.rec_not_hom = not ((self.rec_genotype[0] == self.rec_genotype[1]
                                     and self.rec_genotype[0] == 0) or self.rec_filter != 'PASS')
+
         # If VCF record has one recorded genotype like 1
         elif len(self.rec_genotype) == 1:
             # This mostly means it's heterozygous
             self.rec_not_hom = not (self.rec_genotype[0] == 0)
+
         self.rec_chrom = rec.chrom
         self.rec_alleles = rec.alleles
         self.rec_alts = rec.alts if rec.alts else '.'
@@ -211,9 +213,19 @@ class VCFFileProcessor:
                                            len=len(rec.rec_ref))
             self._update_dictionary(variant_record)
         elif genotype_class == 'IN':
+            if len(rec.rec_ref) > 1:
+                rec.rec_ref, alt = self._trim_insert_sequences(rec.rec_ref, alt)
+
             variant_record = VariantRecord(rec.rec_pos, rec.rec_ref, rec.rec_qual, genotype_class, genotype_type, alt,
                                            len=len(alt))
             self._update_dictionary(variant_record)
+
+    def _trim_insert_sequences(self, ref_seq, alt_seq):
+        length = len(alt_seq) - len(ref_seq)
+        trimmed_ref_seq = ref_seq[0]
+        trimmed_alt_seq = alt_seq[:length+1]
+
+        return trimmed_ref_seq, trimmed_alt_seq
 
     def _update_count(self, genotype_type):
         """
