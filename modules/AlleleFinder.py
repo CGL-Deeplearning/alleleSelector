@@ -1,3 +1,5 @@
+from collections import Counter
+
 """
 Finds allele in a given window. The window is a candidate window where a variant is present.
 
@@ -39,7 +41,6 @@ class CandidateInformation:
         self.map_quality = map_quality
         self.base_qualities = base_qualities
         self.read_direction = read_direction
-
 
     def __str__(self):
         """
@@ -285,4 +286,65 @@ class AlleleFinder:
                 candidate_list.add_candidate_to_list(candidate_object)
 
         return candidate_list
+
+    def _select_alleles(self, allele_list, ref_sequence):
+        """
+        Given a dictionary of allele objects, naively find the top 2 represented sequences and return a dictionary
+        that assigns read_ids to each of the 2 alleles.
+        :param allele_list: the list of alleles found at a given site
+        :param ref_sequence: reference sequence for the candidate window
+        :return: top_2_alleles: the most frequent two alleles
+        """
+
+        alleles_sequences = [allele.allele_sequence for allele in allele_list]
+
+        # find allele distribution by counting instances of each
+        allele_counter = Counter(alleles_sequences)
+
+        if ref_sequence in allele_counter:
+            del allele_counter[ref_sequence]    # don't consider the reference allele
+
+        # keep only the top 2 most frequent alleles (assuming diploidy)
+        i = 0
+        top_2_inserts = list()
+        top_2_non_inserts = list()
+        alleles = [entry[0] for entry in allele_counter.most_common()]
+        while (len(top_2_inserts) < 2 or len(top_2_non_inserts) < 2) and i < len(alleles):
+            if len(alleles[i]) > len(ref_sequence):         # insert
+                if len(top_2_inserts) < 2:
+                    top_2_inserts.append(alleles[i])
+            else:                                           # SNP or delete
+                if len(top_2_non_inserts) < 2:
+                    top_2_non_inserts.append(alleles[i])
+            i += 1
+
+        top_2_inserts += [None]*(2-len(top_2_inserts))
+        top_2_non_inserts += [None]*(2-len(top_2_non_inserts))
+
+        return top_2_inserts, top_2_non_inserts
+
+    def _get_allele_frequency_vector(self, allele_list, ref_sequence, vector_length=8):    # , normalize_by_depth=True):
+        """
+        Find the sorted frequency vector: the # of alleles observed at a site, sorted in descending order
+        :param allele_list: the list of alleles found at a given site
+        :return: top_2_alleles: the most frequent two alleles
+        """
+        # print(allele_list)
+        alleles_sequences = [allele.allele_sequence for allele in allele_list]
+
+        # find allele distribution by counting instances of each
+        allele_counter = Counter(alleles_sequences)
+
+        try:
+            ref_frequency = allele_counter[ref_sequence]
+            del allele_counter[ref_sequence]
+        except KeyError:
+            ref_frequency = 0
+
+        frequencies = sorted(dict(allele_counter).values(), reverse=True)[:vector_length-1]
+        frequencies = [ref_frequency] + frequencies
+        frequencies += [0] * (vector_length - len(frequencies))
+        # frequencies = numpy.array(frequencies)/len(alleles_sequences)
+
+        return frequencies
 

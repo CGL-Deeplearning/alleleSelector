@@ -216,7 +216,6 @@ class View:
         end_time = time.time()
         print('TOTAL TIME: ', end_time-start_time)
 
-
 def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
     """
     Split chromosome in different ranges for parallel processing
