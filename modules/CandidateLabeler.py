@@ -336,11 +336,6 @@ class CandidateLabeler:
         # get separate positional variant dictionaries for IN, DEL, and SNP
         positional_vcfs = {key: value for key, value in zip(types, self.generate_position_based_vcf(variants))}
 
-        # get the unified set of all variant positions
-        pos_in, pos_del, pos_snp = [list(vcf_dict.keys()) for vcf_dict in positional_vcfs.values()]
-        all_positions = pos_in + pos_del + pos_snp
-        validated_vcf_positions = {key: False for key in all_positions}
-
         # list of all labeled candidates
         all_labeled_candidates = []
 
@@ -384,16 +379,6 @@ class CandidateLabeler:
                 print("insert gts:     ", genotypes["IN"])
                 print("del gts:        ", genotypes["DEL"])
                 print("snp gts:        ", genotypes["SNP"])
-
-            # test if the site has any true variants (not Hom)
-            if self._is_position_supported(genotypes):
-                validated_vcf_positions[allele_start] = True
-
-        # see if any sites weren't supported by candidates
-        for pos in validated_vcf_positions:
-            if not validated_vcf_positions[pos]:
-                print("\nWARNING: Unsupported VCF position: ", pos)
-                print("\tRecord: ", variants[pos])
 
         return all_labeled_candidates
 
