@@ -129,19 +129,9 @@ class View:
         Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
         :param candidate_dictionary: dictionary with the list of allele sites under the top-level entry "all_candidates"
         :param filter_hom_ref: whether to ignore hom_ref VCF records during candidate validation
-        :return: labeled_sites: the parsed candidate dictionary with the following structure:
+        :return: labeled_sites: the parsed candidate list with the following structure for each entry:
 
-        {window_start:
-            {
-            chromosome_name
-            window_start
-            window_end
-            ref_sequence
-            alt1_sequence
-            alt2_sequence
-            genotype
-            }
-        }
+        [chromosome_name, start, stop, is_insert, ref_seq, alt1, alt2, gt1, gt2]
         """
         candidate_sites = AllCandidatesInRegion_object.all_candidates
 
