@@ -217,7 +217,7 @@ class View:
         print('TOTAL TIME: ', end_time-start_time)
 
 
-def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads=5):
+def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
     """
     Split chromosome in different ranges for parallel processing
     :param chr_name: Chromosome name
@@ -324,4 +324,5 @@ if __name__ == '__main__':
                     vcf_file_path=FLAGS.vcf)
         view.test(FLAGS.json)
     else:
-        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.json, FLAGS.output_dir, FLAGS.max_threads)
+        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.json,
+                    FLAGS.output_dir, FLAGS.max_threads)
