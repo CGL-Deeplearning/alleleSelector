@@ -24,9 +24,16 @@ from collections import Counter,defaultdict
 
 '''
 
-DEBUG_FREQUENCIES = False
+# DEBUG_FREQUENCIES = False
 DEBUG_PRINT_ALL = False
 
+START = 0
+STOP = 1
+IN_ALLELES = 2
+ALLELES = 3
+
+SNP,IN,DEL = 0,1,2
+SNP_DEL = 3
 
 class CandidateLabeler:
     def __init__(self, fasta_handler):
@@ -75,44 +82,43 @@ class CandidateLabeler:
         :param variants: Variant records from a VCF file
         :return:
         """
-        position_based_vcf_in = {}
-        position_based_vcf_del = {}
-        position_based_vcf_snp = {}
+        position_based_vcf = dict()
+
         for variant_pos in variants:
             for variant in variants[variant_pos]:
-                if variant.genotype_class == 'IN':
-                    pos, ref_seq, alt_seq, genotype = self._handle_insert(variant)
+                if variant.genotype_class == 'SNP':
+                    pos, ref_seq, alt_seq, genotype = variant.pos + self.vcf_offset, variant.ref, variant.alt, variant.type
 
-                    if pos not in position_based_vcf_in:
-                        position_based_vcf_in[pos] = list()
+                    if pos not in position_based_vcf:
+                        position_based_vcf[pos] = [[],[],[]]
 
-                    position_based_vcf_in[pos].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
+                        position_based_vcf[pos][SNP].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
 
-                if variant.genotype_class == 'DEL':
+                elif variant.genotype_class == 'DEL':
                     list_of_records = self._handle_delete(variant)
                     for record in list_of_records:
                         pos, ref_seq, alt_seq, genotype = record
 
-                        if pos not in position_based_vcf_del:
-                            position_based_vcf_del[pos] = list()
+                        if pos not in position_based_vcf:
+                            position_based_vcf[pos] = [[], [], []]
 
-                        position_based_vcf_del[pos].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
+                            position_based_vcf[pos][DEL].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
 
-                if variant.genotype_class == 'SNP':
-                    pos, ref_seq, alt_seq, genotype = variant.pos + self.vcf_offset, variant.ref, variant.alt, variant.type
+                elif variant.genotype_class == 'IN':
+                    pos, ref_seq, alt_seq, genotype = self._handle_insert(variant)
 
-                    if pos not in position_based_vcf_snp:
-                        position_based_vcf_snp[pos] = list()
+                    if pos not in position_based_vcf:
+                        position_based_vcf[pos] = [[],[],[]]
 
-                    position_based_vcf_snp[pos].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
+                        position_based_vcf[pos][IN].append((pos, ref_seq, alt_seq, genotype, variant.genotype_class))
 
-        return position_based_vcf_in, position_based_vcf_del, position_based_vcf_snp
+        return position_based_vcf
 
     @staticmethod
-    def get_label_of_allele(positional_vcfs, variant_type, candidate_allele):
+    def get_label_of_allele(positional_vcf, variant_type, candidate_allele):
         """
         Given positional VCFs (IN, DEL, SNP), variant type and a candidate allele, return the try genotype.
-        :param positional_vcfs: Three dictionaries for each position
+        :param positional_vcf: Three dictionaries for each position
         :param variant_type: Type of variant (IN, DEL or SNP)
         :param candidate_allele: Candidate allele
         :return: genotype
@@ -122,9 +128,9 @@ class CandidateLabeler:
         # by default the genotype is Hom
         gt = 'Hom'
         for i in range(pos_start, pos_stop+1):
-            if i in positional_vcfs[variant_type].keys():
+            if i in positional_vcf.keys():
                 # get all records of that position
-                records = positional_vcfs[variant_type][i]
+                records = positional_vcf[i][variant_type]
                 for record in records:
                     # get the alt allele of the record
                     rec_alt = record[2]
@@ -135,13 +141,13 @@ class CandidateLabeler:
 
         return gt
 
-    def _get_all_genotype_labels(self, positional_vcfs, start, stop, ref_seq, alleles, alleles_insert):
+    def _get_all_genotype_labels(self, positional_vcf, start, stop, ref_seq, alleles, alleles_insert):
         """
         Create a list of dictionaries of 3 types of alleles that can be in a position.
 
         In each position there can be Insert allele, SNP or Del alleles.
         For total 6 alleles, this method returns 6 genotypes
-        :param positional_vcfs: VCF records of each position
+        :param positional_vcf: VCF records of each position
         :param start: Allele start position
         :param stop: Allele stop position
         :param ref_seq: Reference sequence
@@ -149,19 +155,23 @@ class CandidateLabeler:
         :param alleles_insert: Insert Alleles
         :return: Dictionary of genotypes
         """
-        # two alt alleles
-        alt1_seq, alt2_seq = alleles
-        # two alt alleles for insert
-        alt1_seq_insert, alt2_seq_insert = alleles_insert
+        gts_in = list()
+        gts_del = list()
+        gts_snp = list()
 
-        gt1_in = self.get_label_of_allele(positional_vcfs, "IN", (start, stop, ref_seq, alt1_seq_insert))
-        gt2_in = self.get_label_of_allele(positional_vcfs, "IN", (start, stop, ref_seq, alt2_seq_insert))
-        gt1_del = self.get_label_of_allele(positional_vcfs, "DEL", (start, stop, ref_seq, alt1_seq))
-        gt2_del = self.get_label_of_allele(positional_vcfs, "DEL", (start, stop, ref_seq, alt2_seq))
-        gt1_snp = self.get_label_of_allele(positional_vcfs, "SNP", (start, stop, ref_seq, alt1_seq))
-        gt2_snp = self.get_label_of_allele(positional_vcfs, "SNP", (start, stop, ref_seq, alt2_seq))
+        for alt in alleles_insert:
+            gt_in = self.get_label_of_allele(positional_vcf, IN, (start, stop, ref_seq, alt))
 
-        return {"IN": [gt1_in, gt2_in], "DEL": [gt1_del, gt2_del], "SNP": [gt1_snp, gt2_snp]}
+            gts_in.append(gt_in)
+
+        for alt in alleles:
+            gt_del = self.get_label_of_allele(positional_vcf, DEL, (start, stop, ref_seq, alt))
+            gt_snp = self.get_label_of_allele(positional_vcf, SNP, (start, stop, ref_seq, alt))
+
+            gts_snp.append(gt_snp)
+            gts_del.append(gt_del)
+
+        return [gts_snp, gts_in, gts_del]
 
     @staticmethod
     def _is_supported(genotypes):
@@ -170,8 +180,19 @@ class CandidateLabeler:
         :param genotypes: Genotype tuple
         :return: Boolean [True if it has Het of Hom_alt]
         """
-        gt1, gt2 = genotypes
-        return not (gt1 == "Hom" and (gt2 == "Hom" or gt2 is None))
+        supported = False
+        gt_set = set(genotypes)
+
+        if len(gt_set) == 1:
+            if "Hom" in gt_set:
+                supported = False
+            else:
+                supported = True
+
+        if len(gt_set) == 0:
+            supported = False
+
+        return supported
 
     def _is_position_supported(self, genotypes):
         """
@@ -179,9 +200,9 @@ class CandidateLabeler:
         :param genotypes: Genotypes list of that position
         :return: Boolean [True if it has Het or Hom_alt]
         """
-        in_supported = self._is_supported(genotypes["IN"])
-        del_supported = self._is_supported(genotypes["DEL"])
-        snp_supported = self._is_supported(genotypes["SNP"])
+        in_supported = self._is_supported(genotypes[IN])
+        del_supported = self._is_supported(genotypes[IN])
+        snp_supported = self._is_supported(genotypes[IN])
 
         return in_supported or del_supported or snp_supported
 
@@ -202,45 +223,46 @@ class CandidateLabeler:
         merged_genotype = ['Hom', 'Hom']
         supported = set()
 
-        if self._is_supported(genotypes["SNP"]) and self._is_supported(genotypes["DEL"]):
-            variant_type = "SNP/DEL"
+        if self._is_supported(genotypes[SNP]) and self._is_supported(genotypes[DEL]):
+            variant_type = "SNP_DEL"
             is_insert = False
             supported.add(variant_type)
             alleles = [allele if allele is not None else "None" for allele in alleles]
-            merged_genotype = self._merge_snp_and_del(alleles,genotypes["SNP"],genotypes["DEL"])
+            merged_genotype = self._merge_snp_and_del(alleles, genotypes[SNP], genotypes[DEL])
 
-        elif self._is_supported(genotypes["SNP"]):
+        elif self._is_supported(genotypes[SNP]):
             variant_type = "SNP"
             is_insert = False
             supported.add(variant_type)
             alleles = [allele if allele is not None else "None" for allele in alleles]
-            merged_genotype = genotypes["SNP"]
+            merged_genotype = genotypes[SNP]
 
-        elif self._is_supported(genotypes["IN"]):
+        elif self._is_supported(genotypes[IN]):
             variant_type = "IN"
             is_insert = True
             supported.add(variant_type)
             alleles = [allele if allele is not None else "None" for allele in alleles_insert]
-            merged_genotype = genotypes["IN"]
+            merged_genotype = genotypes[IN]
 
-        elif self._is_supported(genotypes["DEL"]):
+        elif self._is_supported(genotypes[DEL]):
             variant_type = "DEL"
             is_insert = False
             supported.add(variant_type)
             alleles = [allele if allele is not None else "None" for allele in alleles]
-            merged_genotype = genotypes["DEL"]
+            merged_genotype = genotypes[DEL]
 
         if len(supported) == 0:     # no true variant
             variant_type = "SNP"
             is_insert = False
-            alleles = [None, None]
-            merged_genotype = ["Hom", "Hom"]
+            alleles = [None]
+            merged_genotype = ["Hom"]
 
-        alt1, alt2 = alleles
-        gt1, gt2 = merged_genotype
-        data_list = [chromosome_name, start, stop, is_insert, ref_seq, alt1, alt2, gt1, gt2]
+        data_list = [chromosome_name, start, stop, is_insert, ref_seq] + alleles + merged_genotype
         # bed conversion can't handle None type, so convert all None to string 'None'
         data_list = ['None' if v is None else v for v in data_list]
+
+        print(data_list)
+
         return data_list
 
     @staticmethod
@@ -324,40 +346,36 @@ class CandidateLabeler:
 
         return frequencies
 
-    def get_labeled_candidates(self, variants, candidate_sites):
+    def get_labeled_candidates(self, chromosome_name, variants, candidate_sites):
         """
         Label candidates given variants from a VCF
         :param variants: VCF records
         :param candidate_sites: Candidates
         :return: List of labeled candidate sites
         """
-        types = ["IN", "DEL", "SNP"]
-
         # get separate positional variant dictionaries for IN, DEL, and SNP
-        positional_vcfs = {key: value for key, value in zip(types, self.generate_position_based_vcf(variants))}
+        positional_vcf = self.generate_position_based_vcf(variants)
+
+
+        # create a log of whether variant positions have been matched to a candidate
+        validated_vcf_positions = {key: False for key in positional_vcf.keys()}
 
         # list of all labeled candidates
         all_labeled_candidates = []
 
         # for each candidate
         for candidate_site in candidate_sites:
-            chromosome_name = candidate_site.chromosome_name
-            allele_start = candidate_site.window_start
-            allele_stop = candidate_site.window_end
+            allele_start = candidate_site[START]
+            allele_stop = candidate_site[STOP]
+            alleles_insert = candidate_site[IN_ALLELES]
+            alleles = candidate_site[ALLELES]
 
             ref_sequence = self.fasta_handler.get_sequence(chromosome_name=chromosome_name,
                                                            start=allele_start,
                                                            stop=allele_stop + 1)
 
-            if DEBUG_FREQUENCIES:
-                frequencies = self._get_allele_frequency_vector(candidate_site.candidate_alleles, ref_sequence)
-
-            # get selected insert and non-insert alleles (alt1,alt2) (alt1_insert,alt2_insert)
-            alleles_insert, alleles = self._select_alleles(allele_list=candidate_site.candidate_alleles,
-                                                           ref_sequence=ref_sequence)
-
             # test the alleles across IN, DEL, and SNP variant dictionaries
-            genotypes = self._get_all_genotype_labels(positional_vcfs=positional_vcfs,
+            genotypes = self._get_all_genotype_labels(positional_vcf=positional_vcf,
                                                       start=allele_start,
                                                       stop=allele_stop,
                                                       ref_seq=ref_sequence,
@@ -365,19 +383,30 @@ class CandidateLabeler:
                                                       alleles_insert=alleles_insert)
 
             # get a list of attributes that can be saved
-            labeled_candidate_list = self._generate_list(chromosome_name, allele_start, allele_stop,
+            labeled_candidate_data = self._generate_list(chromosome_name, allele_start, allele_stop,
                                                          alleles, alleles_insert, ref_sequence, genotypes)
-            all_labeled_candidates.append(labeled_candidate_list)
+
+            all_labeled_candidates.append(labeled_candidate_data)
 
             if DEBUG_PRINT_ALL:
                 print()
                 print(allele_start,allele_stop,ref_sequence)
-                if DEBUG_FREQUENCIES:
-                    print("frequencies:    ", frequencies)
-                print("alleles:        ",alleles)
-                print("insert alleles: ",alleles_insert)
-                print("insert gts:     ", genotypes["IN"])
-                print("del gts:        ", genotypes["DEL"])
-                print("snp gts:        ", genotypes["SNP"])
+                print("alleles:        ", alleles)
+                print("insert alleles: ", alleles_insert)
+                print("insert gts:     ", genotypes[IN])
+                print("del gts:        ", genotypes[DEL])
+                print("snp gts:        ", genotypes[SNP])
+
+            # test if the site has any true variants (not Hom)
+            if self._is_position_supported(genotypes):
+
+                if allele_start in validated_vcf_positions:
+                    validated_vcf_positions[allele_start] = True
+
+        # # see if any sites weren't supported by candidates
+        # for pos in validated_vcf_positions:
+        #     if not validated_vcf_positions[pos]:
+        #         print("\nWARNING: Unsupported VCF position: ", positional_vcf[pos])
+        #         print("\tRecord: ", positional_vcf[pos])
 
         return all_labeled_candidates

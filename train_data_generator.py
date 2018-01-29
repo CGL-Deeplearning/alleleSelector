@@ -151,7 +151,9 @@ class View:
 
         allele_selector = CandidateLabeler(fasta_handler=self.fasta_handler)
 
-        labeled_sites = allele_selector.get_labeled_candidates(variants=variants, candidate_sites=candidate_sites)
+        labeled_sites = allele_selector.get_labeled_candidates(chromosome_name=chromosome_name,
+                                                               variants=variants,
+                                                               candidate_sites=candidate_sites)
 
         return labeled_sites
 
