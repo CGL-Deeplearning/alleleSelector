@@ -65,13 +65,13 @@ class AllCandidatesInRegion:
         self.end_position = end_position
         self.all_candidates = []
 
-    def add_candidate_to_list(self, alignment_candidates_object):
+    def add_candidate_to_list(self, alignment_candidates_tuple):
         """
         Add a candidate to the list
         :param alignment_candidates_object: Candidate object to add
         :return:
         """
-        self.all_candidates.append(alignment_candidates_object)
+        self.all_candidates.append(alignment_candidates_tuple)
 
     def reprJSON(self):
         """
@@ -191,17 +191,20 @@ class View:
             # generate base dictionaries
             allele_finder.generate_base_dictionaries()
             # generate candidate allele list
-            candidate_list = allele_finder.generate_candidate_allele_list()
+            in_alleles, snp_alleles = allele_finder.generate_candidate_allele_list()
 
             if DEBUG_PRINT_CANDIDATES:
-                candidate_list.print_all_candidates()
+                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles)
+
             # add alleles to candidate
-            all_candidate_lists.add_candidate_to_list(candidate_list)
+            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles))
 
         if json_out:
             self.write_json(start_position, end_position, all_candidate_lists)
 
+        ### RYAN STARS HERE
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
+
         bed_file = BedHandler.list_to_bed(labeled_sites)
         self.write_bed(start_position, end_position, bed_file)
 
@@ -212,7 +215,7 @@ class View:
         :return:
         """
         start_time = time.time()
-        self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
+        self.parse_region(start_position=100000, end_position=400000, json_out=json_out)
         end_time = time.time()
         print('TOTAL TIME: ', end_time-start_time)
 
