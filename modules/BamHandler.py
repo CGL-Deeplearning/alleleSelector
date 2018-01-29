@@ -40,5 +40,5 @@ class BamHandler:
         :param stop: Site end in the chromosome
         :return: Reads that align to that site
         """
-        return self.bamFile.fetch(contig=chromosome_name, start=start, end=stop)
+        return self.bamFile.fetch(chromosome_name, start, stop)
 

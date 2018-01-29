@@ -1,6 +1,6 @@
 from modules.AlleleFileHandler import AlleleFileHandler
 from modules.CandidateLabeler import CandidateLabeler
-from modules.vcf_handler import VCFFileProcessor
+from modules.VcfHandler import VCFFileProcessor
 from modules.FastaHandler import FastaHandler
 from os import listdir, mkdir
 from os.path import isfile, join, exists

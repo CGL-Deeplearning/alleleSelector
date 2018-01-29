@@ -11,7 +11,7 @@ from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from modules.AlleleFinder import AlleleFinder
-from modules.vcf_handler import VCFFileProcessor
+from modules.VcfHandler import VCFFileProcessor
 """
 alignmentPolish finds possible variant sites in given bam file.
 

@@ -329,7 +329,7 @@ class VCFFileProcessor:
         """
 
         try:
-            self.vcf_records = pysam.VariantFile(self.file_path).fetch(region=contig, start=start_pos, end=end_pos)
+            self.vcf_records = pysam.VariantFile(self.file_path).fetch(contig, start_pos, end_pos)
         except IOError:
             sys.stderr.write("VCF FILE READ ERROR")
 

@@ -9,8 +9,9 @@ from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from modules.AlleleFinder import AlleleFinder
 from multiprocessing import Process
-from modules.vcf_handler import VCFFileProcessor
+from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
+from modules.BedHandler import BedHandler
 
 """
 alignmentPolish finds possible variant sites in given bam file.
@@ -109,6 +110,20 @@ class View:
                          + str(start) + '_' + str(end) + ".json", 'w')
         json_file.write(json.dumps(all_candidate_lists.reprJSON(), cls=ComplexEncoder, indent=4, sort_keys=True))
 
+    def write_bed(self, start, end, bedTools_object):
+        """
+        Create a json output of all candidates found in the region
+        :param start: Candidate region start
+        :param end: Candidate region end
+        :param all_candidate_lists: Candidate list to be saved
+        :return:
+        """
+        if not os.path.exists(self.output_dir + "bed_output/"):
+            os.mkdir(self.output_dir + "bed_output/")
+
+        bedTools_object.saveas(self.output_dir + "bed_output/" + "Labeled_sites" + '_' +
+                               self.chromosome_name + '_'+ str(start) + '_' + str(end) + ".bed", 'w')
+
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
         """
         Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
@@ -146,16 +161,9 @@ class View:
 
         allele_selector = CandidateLabeler(fasta_handler=self.fasta_handler)
 
-        labeled_sites = allele_selector.get_labeled_candidates2(variants=variants, candidate_sites=candidate_sites)
+        labeled_sites = allele_selector.get_labeled_candidates(variants=variants, candidate_sites=candidate_sites)
 
         return labeled_sites
-
-    def label_sites(self, candidate_dictionary):
-        """
-        :param json_directory_path: path containing any number of json files with candidate site data
-        :return:
-        """
-        labeled_sites = self.get_labeled_candidate_sites(candidate_dictionary, filter_hom_ref=True)
 
     def parse_region(self, start_position, end_position, json_out):
         """
@@ -204,12 +212,8 @@ class View:
             self.write_json(start_position, end_position, all_candidate_lists)
 
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
-        # for sites in labeled_sites:
-        #     print(sites)
-        print(len(labeled_sites))
-
-        # print(labeled_sites)
-        # 121335  877     A       C       Het     SNP
+        bed_file = BedHandler.list_to_bed(labeled_sites)
+        self.write_bed(start_position, end_position, bed_file)
 
     def test(self, json_out):
         """
@@ -217,10 +221,13 @@ class View:
         :param json_out:
         :return:
         """
+        start_time = time.time()
         self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
+        end_time = time.time()
+        print('TOTAL TIME: ', end_time-start_time)
 
 
-def do_parallel(chr_name, bam_file, ref_file, json_out, output_dir, max_threads=5):
+def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads=5):
     """
     Split chromosome in different ranges for parallel processing
     :param chr_name: Chromosome name
@@ -243,8 +250,8 @@ def do_parallel(chr_name, bam_file, ref_file, json_out, output_dir, max_threads=
         view = View(chromosome_name=chr_name,
                     bam_file_path=bam_file,
                     reference_file_path=ref_file,
-                    output_file_path=output_dir
-                    )
+                    output_file_path=output_dir,
+                    vcf_file_path=vcf_file)
         start_position = i*each_segment_length
         end_position = (i+1) * each_segment_length + 1000
         p = Process(target=view.parse_region, args=(start_position, end_position, json_out))
