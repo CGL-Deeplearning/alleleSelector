@@ -122,7 +122,7 @@ class View:
             os.mkdir(self.output_dir + "bed_output/")
 
         bedTools_object.saveas(self.output_dir + "bed_output/" + "Labeled_sites" + '_' +
-                               self.chromosome_name + '_'+ str(start) + '_' + str(end) + ".bed", 'w')
+                               self.chromosome_name + '_'+ str(start) + '_' + str(end) + ".bed")
 
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
         """
