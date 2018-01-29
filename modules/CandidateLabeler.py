@@ -392,8 +392,8 @@ class CandidateLabeler:
         # see if any sites weren't supported by candidates
         for pos in validated_vcf_positions:
             if not validated_vcf_positions[pos]:
-                print("\nWARNING: Unsupported VCF position: ", positional_vcfs[pos])
-                print("\tRecord: ", positional_vcfs[pos])
+                print("\nWARNING: Unsupported VCF position: ", pos)
+                print("\tRecord: ", variants[pos])
 
         return all_labeled_candidates
 
