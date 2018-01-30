@@ -12,6 +12,13 @@ position.
 - get_variant_dictionary() is called to get the dictionary
 """
 
+SNP = 0
+IN = 1
+DEL = 2
+HOM = 0
+HET = 1
+HOM_ALT = 2
+
 
 class VCFRecord:
     """
@@ -72,41 +79,6 @@ class VCFRecord:
         return return_str
 
 
-class VariantRecord:
-    """
-    VariantRecord is set as dictionary value in each position where there is a variant.
-    - Used for set values in VCF dictionary
-    - Not used for filtering the VCF
-    """
-    def __init__(self, pos, ref, qual, genotype_class, genotype_type, alt, len):
-        """
-        Get attributes of a record and set values.
-        :param pos: Position in chromosome
-        :param ref: Reference base in that position
-        :param qual: Quality of the record
-        :param genotype_class: Class of the genotype ('SNP', 'IN', 'DEL')
-        :param genotype_type: Type of genotype ('Hom', 'Het', 'Hom-alt')
-        :param alt: Alternate allele of the record
-        :param len: Length of the record
-        """
-        self.pos = pos
-        self.qual = qual
-        self.ref = ref
-        self.alt = alt
-        self.type = genotype_type
-        self.genotype_class = genotype_class
-        self.len = len
-
-    def __str__(self):
-        """
-        Print a record
-        :return: String to print
-        """
-        return_str = str(self.pos) + '\t' + str(int(self.qual)) + '\t' + str(self.ref) + '\t' + str(self.alt) + \
-                     '\t' + str(self.type) + '\t' + str(self.genotype_class)
-        return return_str
-
-
 class VCFFileProcessor:
     """
     Processes a file and generates a dictionary
@@ -122,6 +94,7 @@ class VCFFileProcessor:
         self.total_hom = 0
         self.total_het = 0
         self.total_hom_alt = 0
+        self.vcf_offset = -1
 
     def __str__(self):
         """
@@ -184,16 +157,41 @@ class VCFFileProcessor:
         :return:
         """
         if ref_pos not in self.genotype_dictionary.keys():
-            self.genotype_dictionary[ref_pos] = []
+            self.genotype_dictionary[ref_pos] = [[], [], []]
 
-    def _update_dictionary(self, variant_record):
+    def _genotype_indexer(self, genotype):
+        if genotype == 'Hom':
+            return HOM
+        if genotype == 'Het':
+            return HET
+        if genotype == 'Hom_alt':
+            return HOM_ALT
+
+    def _handle_delete(self, pos, ref, alt, genotype):
+        """
+        Process a record that has deletes.
+        Deletes are usually grouped together, so we break each of the deletes to make a list.
+        :param rec: VCF record containing a delete
+        :return: A list of delete attributes
+        """
+        delete_list = []
+        for i in range(0, len(ref)):
+            if i < len(alt):
+                continue
+            ref_seq = ref[i]
+            alt_seq = '*'
+            pos = pos + i + self.vcf_offset
+            delete_list.append((pos, ref_seq, alt_seq, genotype))
+        return delete_list
+
+    def _update_dictionary(self, pos, variant_record, genotype_class):
         """
         Add a record to the dictionary
         :param variant_record: Record to be added in the dictionary
         :return:
         """
-        self._initialize_dictionary(variant_record.pos)
-        self.genotype_dictionary[variant_record.pos].append(variant_record)
+        self._initialize_dictionary(pos)
+        self.genotype_dictionary[pos][genotype_class].append(variant_record)
 
     def _process_genotype_by_class(self, rec, genotype_class, genotype_type, alt):
         """
@@ -205,20 +203,20 @@ class VCFFileProcessor:
         :return:
         """
         if genotype_class == 'SNP':
-            variant_record = VariantRecord(rec.rec_pos, rec.rec_ref, rec.rec_qual, genotype_class, genotype_type, alt,
-                                           len=len(rec.rec_ref))
-            self._update_dictionary(variant_record)
+            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type))
+            self._update_dictionary(rec.rec_pos + self.vcf_offset, position_based_vcf, SNP)
         elif genotype_class == 'DEL':
-            variant_record = VariantRecord(rec.rec_pos, rec.rec_ref, rec.rec_qual, genotype_class, genotype_type, alt,
-                                           len=len(rec.rec_ref))
-            self._update_dictionary(variant_record)
+            list_of_records = self._handle_delete(rec.rec_pos, rec.rec_ref, alt, genotype_type)
+            for record in list_of_records:
+                pos, ref_seq, alt_seq, genotype = record
+                position_based_vcf = (ref_seq, alt_seq, self._genotype_indexer(genotype))
+                self._update_dictionary(pos, position_based_vcf, DEL)
         elif genotype_class == 'IN':
             if len(rec.rec_ref) > 1:
                 rec.rec_ref, alt = self._trim_insert_sequences(rec.rec_ref, alt)
 
-            variant_record = VariantRecord(rec.rec_pos, rec.rec_ref, rec.rec_qual, genotype_class, genotype_type, alt,
-                                           len=len(alt))
-            self._update_dictionary(variant_record)
+            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type))
+            self._update_dictionary(rec.rec_pos + self.vcf_offset, position_based_vcf, IN)
 
     def _trim_insert_sequences(self, ref_seq, alt_seq):
         length = len(alt_seq) - len(ref_seq)
