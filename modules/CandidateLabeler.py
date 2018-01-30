@@ -313,6 +313,6 @@ class CandidateLabeler:
                 print("\nWARNING: Unsupported VCF position: ", pos)
                 print("\tRecord: ", positional_vcf[pos])
 
-        print("missed vcf positions: ", float(len(positional_vcf))/n_unsupported)
+        # print("missed vcf positions: ", float(len(positional_vcf))/n_unsupported)
 
         return all_labeled_candidates
