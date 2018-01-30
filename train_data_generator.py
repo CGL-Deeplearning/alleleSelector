@@ -147,12 +147,13 @@ class View:
                                              end_pos=stop,
                                              hom_filter=filter_hom_ref)
 
-        variants = self.vcf_handler.get_variant_dictionary()
+        # get separate positional variant dictionaries for IN, DEL, and SNP
+        positional_variants = self.vcf_handler.get_variant_dictionary()
 
         allele_selector = CandidateLabeler(fasta_handler=self.fasta_handler)
 
         labeled_sites = allele_selector.get_labeled_candidates(chromosome_name=chromosome_name,
-                                                               variants=variants,
+                                                               positional_vcf=positional_variants,
                                                                candidate_sites=candidate_sites)
 
         return labeled_sites
@@ -217,7 +218,7 @@ class View:
         :return:
         """
         start_time = time.time()
-        self.parse_region(start_position=100000, end_position=400000, json_out=json_out)
+        self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
         end_time = time.time()
         print('TOTAL TIME: ', end_time-start_time)
 
