@@ -180,8 +180,8 @@ class VCFFileProcessor:
                 continue
             ref_seq = ref[i]
             alt_seq = '*'
-            pos = pos + i + self.vcf_offset
-            delete_list.append((pos, ref_seq, alt_seq, genotype))
+            pos_del = pos + i + self.vcf_offset
+            delete_list.append((pos_del, ref_seq, alt_seq, genotype))
         return delete_list
 
     def _update_dictionary(self, pos, variant_record, genotype_class):
