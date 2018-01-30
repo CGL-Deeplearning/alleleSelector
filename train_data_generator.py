@@ -3,6 +3,7 @@ import math
 import time
 import json
 import os
+import sys
 
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
@@ -36,7 +37,7 @@ A region can have multiple windows and each window belongs to a region.
 
 DEBUG_PRINT_WINDOWS = False
 DEBUG_PRINT_CANDIDATES = False
-
+DEBUG_TIME_PROFILE = True
 
 class ComplexEncoder(json.JSONEncoder):
     """
@@ -163,6 +164,8 @@ class View:
         Find possible candidate windows.
         - All candidate lists
         """
+        if DEBUG_TIME_PROFILE:
+            start_time = time.time()
         reads = self.bam_handler.get_reads(chromosome_name=self.chromosome_name,
                                            start=start_position,
                                            stop=end_position)
@@ -210,16 +213,17 @@ class View:
         bed_file = BedHandler.list_to_bed(labeled_sites)
         self.write_bed(start_position, end_position, bed_file)
 
+        if DEBUG_TIME_PROFILE:
+            end_time = time.time()
+            sys.stderr.write('TOTAL TIME: ' + str(end_time - start_time))
+
     def test(self, json_out):
         """
         Run a test
         :param json_out:
         :return:
         """
-        start_time = time.time()
         self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
-        end_time = time.time()
-        print('TOTAL TIME: ', end_time-start_time)
 
 
 def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
