@@ -3,15 +3,17 @@ import math
 import time
 import json
 import os
-import collections
-from multiprocessing import Process
-from collections import defaultdict
+import sys
 
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from modules.AlleleFinder import AlleleFinder
-from modules.vcf_handler import VCFFileProcessor
+from multiprocessing import Process
+from modules.VcfHandler import VCFFileProcessor
+from modules.CandidateLabeler import CandidateLabeler
+from modules.BedHandler import BedHandler
+
 """
 alignmentPolish finds possible variant sites in given bam file.
 
@@ -28,8 +30,14 @@ Region: A genomic region of interest where we want to find possible variant cand
 Window: A window in genomic region where there can be multiple alleles
 
 A region can have multiple windows and each window belongs to a region.
+
+ Example Usage:
+ python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --json [True/False] --output_dir [path_to_JSON_output] 
 """
 
+DEBUG_PRINT_WINDOWS = False
+DEBUG_PRINT_CANDIDATES = False
+DEBUG_TIME_PROFILE = True
 
 class ComplexEncoder(json.JSONEncoder):
     """
@@ -58,13 +66,13 @@ class AllCandidatesInRegion:
         self.end_position = end_position
         self.all_candidates = []
 
-    def add_candidate_to_list(self, alignment_candidates_object):
+    def add_candidate_to_list(self, alignment_candidates_tuple):
         """
         Add a candidate to the list
         :param alignment_candidates_object: Candidate object to add
         :return:
         """
-        self.all_candidates.append(alignment_candidates_object)
+        self.all_candidates.append(alignment_candidates_tuple)
 
     def reprJSON(self):
         """
@@ -79,10 +87,12 @@ class View:
     """
     Works as a main class and handles user interaction with different modules.
     """
-    def __init__(self, chromosome_name, bam_file_path, reference_file_path):
+    def __init__(self, chromosome_name, bam_file_path, reference_file_path, output_file_path, vcf_file_path):
         # --- initialize handlers ---
         self.bam_handler = BamHandler(bam_file_path)
         self.fasta_handler = FastaHandler(reference_file_path)
+        self.output_dir = output_file_path
+        self.vcf_handler = VCFFileProcessor(file_path=vcf_file_path)
 
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
@@ -95,16 +105,67 @@ class View:
         :param all_candidate_lists: Candidate list to be saved
         :return:
         """
-        if not os.path.exists("json_output/"):
-            os.mkdir("json/")
-        smry = open("json/" + "Candidates" + '_' + self.chromosome_name + '_' + str(start) + '_' + str(end) + ".json", 'w')
-        smry.write(json.dumps(all_candidate_lists.reprJSON(), cls=ComplexEncoder, indent=4, sort_keys=True))
+        if not os.path.exists(self.output_dir + "json_output/"):
+            os.mkdir(self.output_dir + "json_output/")
+        json_file = open(self.output_dir + "json_output/" + "Candidates" + '_' + self.chromosome_name + '_'
+                         + str(start) + '_' + str(end) + ".json", 'w')
+        json_file.write(json.dumps(all_candidate_lists.reprJSON(), cls=ComplexEncoder, indent=4, sort_keys=True))
+
+    def write_bed(self, start, end, bedTools_object):
+        """
+        Create a json output of all candidates found in the region
+        :param start: Candidate region start
+        :param end: Candidate region end
+        :param all_candidate_lists: Candidate list to be saved
+        :return:
+        """
+        if not os.path.exists(self.output_dir + "bed_output/"):
+            os.mkdir(self.output_dir + "bed_output/")
+
+        bedTools_object.saveas(self.output_dir + "bed_output/" + "Labeled_sites" + '_' +
+                               self.chromosome_name + '_'+ str(start) + '_' + str(end) + ".bed")
+
+    def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
+        """
+        Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
+        :param candidate_dictionary: dictionary with the list of allele sites under the top-level entry "all_candidates"
+        :param filter_hom_ref: whether to ignore hom_ref VCF records during candidate validation
+        :return: labeled_sites: the parsed candidate list with the following structure for each entry:
+
+        [chromosome_name, start, stop, is_insert, ref_seq, alt1, alt2, gt1, gt2]
+        """
+        candidate_sites = AllCandidatesInRegion_object.all_candidates
+
+        # find start and stop position of region that covers all candidates
+
+        chromosome_name = AllCandidatesInRegion_object.chromosome_name
+        start = AllCandidatesInRegion_object.start_position
+        stop = AllCandidatesInRegion_object.end_position
+
+        # get dictionary of variant records for full region
+        self.vcf_handler.populate_dictionary(contig=chromosome_name,
+                                             start_pos=start,
+                                             end_pos=stop,
+                                             hom_filter=filter_hom_ref)
+
+        # get separate positional variant dictionaries for IN, DEL, and SNP
+        positional_variants = self.vcf_handler.get_variant_dictionary()
+
+        allele_selector = CandidateLabeler(fasta_handler=self.fasta_handler)
+
+        labeled_sites = allele_selector.get_labeled_candidates(chromosome_name=chromosome_name,
+                                                               positional_vcf=positional_variants,
+                                                               candidate_sites=candidate_sites)
+
+        return labeled_sites
 
     def parse_region(self, start_position, end_position, json_out):
         """
         Find possible candidate windows.
         - All candidate lists
         """
+        if DEBUG_TIME_PROFILE:
+            start_time = time.time()
         reads = self.bam_handler.get_reads(chromosome_name=self.chromosome_name,
                                            start=start_position,
                                            stop=end_position)
@@ -119,99 +180,61 @@ class View:
         # merge candidate positions
         candidate_finder.merge_positions()
         # print the windows we got
-        # candidate_finder.print_windows()
+        if DEBUG_PRINT_WINDOWS:
+            candidate_finder.print_windows()
 
         candidate_windows = candidate_finder.get_candidate_windows()
         all_candidate_lists = AllCandidatesInRegion(self.chromosome_name, start_position, end_position)
 
         # for each window find list of possible alleles
         for chr_name, window_start, window_end in candidate_windows:
+            # get the reference sequence
             reference_sequence = self.fasta_handler.get_sequence(chr_name, window_start, window_end+1)
+            # get all pileup columns in that window
             pileup_columns = self.bam_handler.get_pileupcolumns_aligned_to_a_region(chr_name, window_start, window_end+1)
+
             allele_finder = AlleleFinder(chr_name, window_start, window_end, pileup_columns, reference_sequence)
+            # generate base dictionaries
             allele_finder.generate_base_dictionaries()
-            candidate_list = allele_finder.generate_candidate_allele_list()
-            # candidate_list.print_all_candidates()
-            all_candidate_lists.add_candidate_to_list(candidate_list)
+            # generate candidate allele list
+            in_alleles, snp_alleles, del_alleles = allele_finder.generate_candidate_allele_list()
+
+            if DEBUG_PRINT_CANDIDATES:
+                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles, 'DELs', del_alleles)
+
+            # add alleles to candidate
+            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles, del_alleles))
 
         if json_out:
             self.write_json(start_position, end_position, all_candidate_lists)
 
-        return all_candidate_lists
+        labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
 
-    def validate_candidates(self, all_candidate_lists, vcf_dict, summary_file, output_file):
-        self.all_pos_in_vcf = defaultdict(int)
-        for pos in vcf_dict.keys():
-            for record in vcf_dict[pos]:
-                self.all_pos_in_vcf[record.pos] = True
+        bed_file = BedHandler.list_to_bed(labeled_sites)
+        self.write_bed(start_position, end_position, bed_file)
 
-        for AlleleCandidateList_object in all_candidate_lists:
-            start = AlleleCandidateList_object.window_start
-            end = AlleleCandidateList_object.window_end
-            ref_seq = AlleleCandidateList_object.reference_sequence
+        if DEBUG_TIME_PROFILE:
+            end_time = time.time()
+            sys.stderr.write('TOTAL TIME: ' + str(end_time - start_time))
 
-            CandidateInformation_objects = AlleleCandidateList_object.candidate_alleles
-            all_alleles = []
-            for candidate in CandidateInformation_objects:
-                allele_sequence = candidate.allele_sequence
-                all_alleles.append(allele_sequence)
-            counter = collections.Counter(all_alleles)
-            top_2_alleles = counter.most_common(2)
-            if len(top_2_alleles) == 2:
-                alt_1, alt_2 = top_2_alleles[0], top_2_alleles[1]
-            else:
-                alt_1 = top_2_alleles[0]
-                alt_2 = ''
-
-            output_file.write("Found allele: " + '\n')
-            output_file.write(str(start) + " " + str(end) + str(ref_seq) + str(alt_1) + str(alt_2) + '\n')
-            for pos in range(start, end+1):
-                if pos in vcf_dict.keys():
-                    for record in vcf_dict[pos]:
-                        self.all_pos_in_vcf[record.pos] = False
-                        output_file.write(str(record) + '\n')
-            output_file.write("-----------" + '\n')
-
-        total_positions = 0
-        total_not_found = 0
-        for pos in self.all_pos_in_vcf.keys():
-            total_positions += 1
-            if self.all_pos_in_vcf[pos] is True:
-                total_not_found += 1
-                summary_file.write("IN VCF BUT NOT FOUND: " + str(pos) + '\n')
-
-        return total_positions, total_not_found
-
-    def test(self, vcf_file_path, start_position, end_position):
-        if not os.path.exists("tmp/"):
-            os.mkdir("tmp/")
-        smry = open("tmp/" + "summary" + '_' + self.chromosome_name + '_' + str(start_position) + '_' + str(
-            end_position) + ".csv", 'w')
-        output = open("tmp/" + "output" + '_' + self.chromosome_name + '_' + str(start_position) + '_' + str(
-            end_position) + ".txt", 'w')
-
-        start_time = time.time()
-        AllCandidatesInRegion_object = self.parse_region(start_position=start_position, end_position=end_position, json_out=False)
-        end_time = time.time()
-
-        vcf_handler = VCFFileProcessor(vcf_file_path)
-        vcf_handler.populate_dictionary(self.chromosome_name, start_position, end_position, hom_filter=True)
-
-        # get the vcf dictionary of that region
-        vcf_dict = vcf_handler.get_variant_dictionary()
-
-        total_positions, total_not_found = self.validate_candidates(AllCandidatesInRegion_object.all_candidates, vcf_dict, smry, output)
-
-        smry.write("SUMMARY: " + '\n')
-        smry.write("TIME ELAPSED: " + str(end_time - start_time) + '\n')
-        smry.write("TOTAL POSITIONS IN VCF: " + str(total_positions) + '\n')
-        smry.write("TOTAL POSITIONS NOT PICKED: " + str(total_not_found) + '\n')
+    def test(self, json_out):
+        """
+        Run a test
+        :param json_out:
+        :return:
+        """
+        self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
 
 
-def do_parallel(chr_name, bam_file, ref_file, vcf_file, max_threads=5):
+def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
     """
-    Split the chromosome into different ranges for parallel processing.
-    :param max_threads: Maximum number of threads to create
+    Split chromosome in different ranges for parallel processing
+    :param chr_name: Chromosome name
+    :param bam_file: Bam file path
+    :param ref_file: Reference file path
+    :param output_dir: Directory for saving output
+    :param json_out: JSON out flag
+    :param max_threads: Maximum number of threads
     :return:
     """
     # entire length of chromosome
@@ -225,11 +248,12 @@ def do_parallel(chr_name, bam_file, ref_file, vcf_file, max_threads=5):
         # parse window of the segment. Use a 1000 overlap for corner cases.
         view = View(chromosome_name=chr_name,
                     bam_file_path=bam_file,
-                    reference_file_path=ref_file
-                    )
+                    reference_file_path=ref_file,
+                    output_file_path=output_dir,
+                    vcf_file_path=vcf_file)
         start_position = i*each_segment_length
         end_position = (i+1) * each_segment_length + 1000
-        p = Process(target=view.test, args=(vcf_file, start_position, end_position))
+        p = Process(target=view.parse_region, args=(start_position, end_position, json_out))
         p.start()
 
 
@@ -281,17 +305,33 @@ if __name__ == '__main__':
         default=False,
         help="If true then output will be in a json file in json folder."
     )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="output/",
+        help="If true then output will be in a json file in json folder."
+    )
 
     FLAGS, unparsed = parser.parse_known_args()
+    # process the output directory
+    if FLAGS.output_dir[-1] != '/':
+        FLAGS.output_dir += '/'
+    if not os.path.exists(FLAGS.output_dir):
+        os.mkdir(FLAGS.output_dir)
 
     view = View(chromosome_name=FLAGS.chromosome_name,
                 bam_file_path=FLAGS.bam,
-                reference_file_path=FLAGS.ref)
+                reference_file_path=FLAGS.ref,
+                output_file_path=FLAGS.output_dir,
+                vcf_file_path=FLAGS.vcf)
 
     if FLAGS.test is True:
         view = View(chromosome_name=FLAGS.chromosome_name,
                     bam_file_path=FLAGS.bam,
-                    reference_file_path=FLAGS.ref)
-        view.test(FLAGS.vcf, start_position=100000, end_position=200000)
+                    reference_file_path=FLAGS.ref,
+                    output_file_path=FLAGS.output_dir,
+                    vcf_file_path=FLAGS.vcf)
+        view.test(FLAGS.json)
     else:
-        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.max_threads)
+        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.json,
+                    FLAGS.output_dir, FLAGS.max_threads)

@@ -25,6 +25,9 @@ Region: A genomic region of interest where we want to find possible variant cand
 Window: A window in genomic region where there can be multiple alleles
 
 A region can have multiple windows and each window belongs to a region.
+
+ Example Usage:
+ python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --json [True/False] --output_dir [path_to_JSON_output] 
 """
 DEBUG_PRINT_WINDOWS = False
 DEBUG_PRINT_CANDIDATES = False

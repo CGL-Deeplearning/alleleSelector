@@ -1,3 +1,5 @@
+from collections import Counter
+
 """
 Finds allele in a given window. The window is a candidate window where a variant is present.
 
@@ -13,6 +15,7 @@ Finds allele in a given window. The window is a candidate window where a variant
     - Goes through all the reads and creates alleles that are possible candidates
 """
 
+PLOIDY = 4
 
 class CandidateInformation:
     """
@@ -48,61 +51,6 @@ class CandidateInformation:
         print_str = str(self.read_id) + "\n" + str(self.allele_sequence) + " " \
                     + str(self.map_quality) + " " + str(self.base_qualities)
         return print_str
-
-    def reprJSON(self):
-        """
-        Report all attributes of this object as a dictionary that can be saved as a JSON
-        :return: A dictionary with key value to be saved in json format
-        """
-        return dict(read_id=self.read_id, allele_sequence=self.allele_sequence, map_quality=self.map_quality,
-                    base_qualities=self.base_qualities, read_direction=self.read_direction)
-
-
-class AlleleCandidateList:
-    """
-    Stores all candidate alleles present in that window
-    """
-    def __init__(self, chromosome_name, window_start, window_end, reference_sequence):
-        """
-        Initiate the list for this window
-        :param chromosome_name: Name of the chromosome where the window is
-        :param window_start: Position where window starts
-        :param window_end: Position where window ends
-        :param reference_sequence: Reference sequence at that window site
-        """
-        self.chromosome_name = chromosome_name
-        self.window_start = window_start
-        self.window_end = window_end
-        self.reference_sequence = reference_sequence
-
-        self.candidate_alleles = []
-
-    def add_candidate_to_list(self, candidate_object):
-        """
-        Add a candidate to the list
-        :param candidate_object: A CandidateInformation object
-        :return:
-        """
-        self.candidate_alleles.append(candidate_object)
-
-    def print_all_candidates(self):
-        """
-        Print all the candidates in the list
-        :return:
-        """
-        print(self.chromosome_name, self.window_start, self.window_end)
-        print(self.reference_sequence)
-
-        for candidate in self.candidate_alleles:
-            print(candidate)
-
-    def reprJSON(self):
-        """
-        Report all attributes of this object as a dictionary that can be saved as a JSON
-        :return: A dictionary with key value to be saved in json format
-        """
-        return dict(chromosome_name=self.chromosome_name, window_start=self.window_start, window_end=self.window_end,
-                    reference_sequence=self.reference_sequence, candidate_alleles=self.candidate_alleles)
 
 
 class AlleleFinder:
@@ -241,6 +189,72 @@ class AlleleFinder:
                     self.get_attributes_to_save(pileupcolumn, pileupread)
                 self.save_info_of_a_position(gen_pos, read_id, base, base_qual, map_qual, is_rev, is_in=False)
 
+    def _select_alleles(self, allele_list, ref_sequence):
+        """
+        Given a dictionary of allele objects, naively find the top 2 represented sequences and return a dictionary
+        that assigns read_ids to each of the 2 alleles.
+        :param allele_list: the list of alleles found at a given site
+        :param ref_sequence: reference sequence for the candidate window
+        :return: top_2_alleles: the most frequent two alleles
+        """
+
+        alleles_sequences = [allele.allele_sequence for allele in allele_list]
+
+        # find allele distribution by counting instances of each
+        allele_counter = Counter(alleles_sequences)
+
+        if ref_sequence in allele_counter:
+            del allele_counter[ref_sequence]    # don't consider the reference allele
+
+        # keep only the top n most frequent alleles (assuming diploidy)
+        n = PLOIDY
+        i = 0
+        top_n_inserts = list()
+        top_n_snps = list()
+        top_n_deletes = list()
+        alleles = [entry[0] for entry in allele_counter.most_common()]
+        while (len(top_n_inserts) < n or len(top_n_deletes) < n or len(top_n_snps) < n) and i < len(alleles):
+            if len(alleles[i]) > len(ref_sequence):         # insert
+                if len(top_n_inserts) < n:
+                    top_n_inserts.append(alleles[i])
+            elif alleles[i] == '*':
+                if len(top_n_deletes) < n:
+                    top_n_deletes.append(alleles[i])
+            else:                                           # SNP or delete
+                if len(top_n_snps) < n:
+                    top_n_snps.append(alleles[i])
+            i += 1
+
+        # top_2_inserts += [None]*(2-len(top_2_inserts))
+        # top_2_non_inserts += [None]*(2-len(top_2_non_inserts))
+
+        return top_n_inserts, top_n_snps, top_n_deletes
+
+    def _get_allele_frequency_vector(self, allele_list, ref_sequence, vector_length=8):    # , normalize_by_depth=True):
+        """
+        Find the sorted frequency vector: the # of alleles observed at a site, sorted in descending order
+        :param allele_list: the list of alleles found at a given site
+        :return: top_2_alleles: the most frequent two alleles
+        """
+        # print(allele_list)
+        alleles_sequences = [allele.allele_sequence for allele in allele_list]
+
+        # find allele distribution by counting instances of each
+        allele_counter = Counter(alleles_sequences)
+
+        try:
+            ref_frequency = allele_counter[ref_sequence]
+            del allele_counter[ref_sequence]
+        except KeyError:
+            ref_frequency = 0
+
+        frequencies = sorted(dict(allele_counter).values(), reverse=True)[:vector_length-1]
+        frequencies = [ref_frequency] + frequencies
+        frequencies += [0] * (vector_length - len(frequencies))
+        # frequencies = numpy.array(frequencies)/len(alleles_sequences)
+
+        return frequencies
+
     def generate_candidate_allele_list(self):
         """
         Generate a list of candidates for the window
@@ -251,9 +265,7 @@ class AlleleFinder:
             return []
 
         reads = self.reads_aligned_to_pos[self.window_start]
-        candidate_list = AlleleCandidateList(self.chromosome_name, self.window_start, self.window_end,
-                                             self.reference_sequence)
-        insert_case = False
+        candidate_list = []
         for read in reads:
 
             candidate_allele = ''
@@ -273,18 +285,19 @@ class AlleleFinder:
                     break
 
                 if read in self.read_insert_dictionary and pos in self.read_insert_dictionary[read]:
-                    insert_case = True
                     base, base_quality, map_quality, orientation = self.read_insert_dictionary[read][pos]
-                    # print(base, base_quality[0], map_quality, orientation)
                     candidate_allele += base
                     candidate_base_quality.extend(base_quality)
                     candidate_map_quality = map_quality
                     candidate_read_is_rev = orientation
 
             if read_covers_whole_window:
-                candidate_object = CandidateInformation(candidate_allele, candidate_map_quality, candidate_base_quality,
+                candidate_info = CandidateInformation(candidate_allele, candidate_map_quality, candidate_base_quality,
                                                         read, candidate_read_is_rev)
-                candidate_list.add_candidate_to_list(candidate_object)
+                candidate_list.append(candidate_info)
 
-        return candidate_list
+        insert_allele, snp_allele, del_alleles = self._select_alleles(candidate_list, self.reference_sequence)
+        # insert_allele = list(filter(None.__ne__, insert_allele))
+        # snp_allele = list(filter(None.__ne__, snp_allele))
+        return insert_allele, snp_allele, del_alleles
 
