@@ -194,18 +194,17 @@ class View:
             # generate base dictionaries
             allele_finder.generate_base_dictionaries()
             # generate candidate allele list
-            in_alleles, snp_alleles = allele_finder.generate_candidate_allele_list()
+            in_alleles, snp_alleles, del_alleles = allele_finder.generate_candidate_allele_list()
 
             if DEBUG_PRINT_CANDIDATES:
-                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles)
+                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles, 'DELs', del_alleles)
 
             # add alleles to candidate
-            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles))
+            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles, del_alleles))
 
         if json_out:
             self.write_json(start_position, end_position, all_candidate_lists)
 
-        ### RYAN STARS HERE
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
 
         bed_file = BedHandler.list_to_bed(labeled_sites)
@@ -221,6 +220,7 @@ class View:
         self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
         end_time = time.time()
         print('TOTAL TIME: ', end_time-start_time)
+
 
 def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
     """

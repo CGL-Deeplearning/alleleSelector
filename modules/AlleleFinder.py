@@ -15,6 +15,7 @@ Finds allele in a given window. The window is a candidate window where a variant
     - Goes through all the reads and creates alleles that are possible candidates
 """
 
+PLOIDY = 4
 
 class CandidateInformation:
     """
@@ -205,24 +206,29 @@ class AlleleFinder:
         if ref_sequence in allele_counter:
             del allele_counter[ref_sequence]    # don't consider the reference allele
 
-        # keep only the top 2 most frequent alleles (assuming diploidy)
+        # keep only the top n most frequent alleles (assuming diploidy)
+        n = PLOIDY
         i = 0
-        top_2_inserts = list()
-        top_2_non_inserts = list()
+        top_n_inserts = list()
+        top_n_snps = list()
+        top_n_deletes = list()
         alleles = [entry[0] for entry in allele_counter.most_common()]
-        while (len(top_2_inserts) < 2 or len(top_2_non_inserts) < 2) and i < len(alleles):
+        while (len(top_n_inserts) < n or len(top_n_deletes) < n or len(top_n_snps) < n) and i < len(alleles):
             if len(alleles[i]) > len(ref_sequence):         # insert
-                if len(top_2_inserts) < 2:
-                    top_2_inserts.append(alleles[i])
+                if len(top_n_inserts) < n:
+                    top_n_inserts.append(alleles[i])
+            elif alleles[i] == '*':
+                if len(top_n_deletes) < n:
+                    top_n_deletes.append(alleles[i])
             else:                                           # SNP or delete
-                if len(top_2_non_inserts) < 2:
-                    top_2_non_inserts.append(alleles[i])
+                if len(top_n_snps) < n:
+                    top_n_snps.append(alleles[i])
             i += 1
 
         # top_2_inserts += [None]*(2-len(top_2_inserts))
         # top_2_non_inserts += [None]*(2-len(top_2_non_inserts))
 
-        return top_2_inserts, top_2_non_inserts
+        return top_n_inserts, top_n_snps, top_n_deletes
 
     def _get_allele_frequency_vector(self, allele_list, ref_sequence, vector_length=8):    # , normalize_by_depth=True):
         """
@@ -286,8 +292,8 @@ class AlleleFinder:
                                                         read, candidate_read_is_rev)
                 candidate_list.append(candidate_info)
 
-        insert_allele, snp_allele = self._select_alleles(candidate_list, self.reference_sequence)
+        insert_allele, snp_allele, del_alleles = self._select_alleles(candidate_list, self.reference_sequence)
         # insert_allele = list(filter(None.__ne__, insert_allele))
         # snp_allele = list(filter(None.__ne__, snp_allele))
-        return insert_allele, snp_allele
+        return insert_allele, snp_allele, del_alleles
 
