@@ -249,7 +249,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
             args = list()
             c_time = time.time()
             sys.stderr.write(TextColor.CYAN + "Chunks: " + str(i+1) + "/" + str(chunks) + ", Percent: " +
-                             str(int(100 * (i+1)/chunks)) + ", Time: " + str(c_time-s_time) + "%\n")
+                             str(int(100 * (i+1)/chunks)) + "%, Time: " + str(round(c_time-s_time,2)/60) + "mins\n")
 
     # return results
     return results
