@@ -218,7 +218,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
 
     # 2MB segments at once
-    each_segment_length = 2000
+    each_segment_length = 1000000
 
     # chunk the chromosome into 1000 pieces
     chunks = int(math.ceil(whole_length / each_segment_length))
@@ -228,7 +228,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     for i in range(chunks):
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
-        end_position = min((i + 1) * each_segment_length + 100, whole_length)
+        end_position = min((i + 1) * each_segment_length + 10, whole_length)
         args.append((chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position))
 
         if i == chunks - 1 or (i + 1) % max_threads == 0:
@@ -246,7 +246,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 
             args = list()
             sys.stderr.write(TextColor.CYAN + "Chunks completed: " + str(i+1) + "/" + str(chunks)
-                             + " Percent completed: " + str((i+1)/chunks) + "%\n")
+                             + " Percent completed: " + str(int(100 * (i+1)/chunks)) + "%\n")
 
     # return results
     return results
