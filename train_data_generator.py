@@ -12,7 +12,7 @@ from modules.AlleleFinder import AlleleFinder
 from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
 from modules.BedHandler import BedHandler
-import modules.TextColor import TextColor
+from modules.TextColor import TextColor
 
 """
 alignmentPolish finds possible variant sites in given bam file.
