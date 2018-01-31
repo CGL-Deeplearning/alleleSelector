@@ -235,8 +235,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     results = pool.map(parallel_run, args)
 
     # wait for all the processes to finish
-    pool.join()
     pool.close()
+    pool.join()
+
     # return results
     return results
 
