@@ -1,18 +1,18 @@
 import argparse
 import math
 import time
-import json
 import os
 import sys
+import multiprocessing
 
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from modules.AlleleFinder import AlleleFinder
-from multiprocessing import Process
 from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
 from modules.BedHandler import BedHandler
+import modules.TextColor import TextColor
 
 """
 alignmentPolish finds possible variant sites in given bam file.
@@ -32,22 +32,12 @@ Window: A window in genomic region where there can be multiple alleles
 A region can have multiple windows and each window belongs to a region.
 
  Example Usage:
- python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --json [True/False] --output_dir [path_to_JSON_output] 
+ python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --output_dir [path_to_output] 
 """
 
 DEBUG_PRINT_WINDOWS = False
 DEBUG_PRINT_CANDIDATES = False
-DEBUG_TIME_PROFILE = True
-
-class ComplexEncoder(json.JSONEncoder):
-    """
-    JSON encoder for class attributes
-    """
-    def default(self, obj):
-        if hasattr(obj, 'reprJSON'):
-            return obj.reprJSON()
-        else:
-            return json.JSONEncoder.default(self, obj)
+DEBUG_TIME_PROFILE = False
 
 
 class AllCandidatesInRegion:
@@ -74,14 +64,6 @@ class AllCandidatesInRegion:
         """
         self.all_candidates.append(alignment_candidates_tuple)
 
-    def reprJSON(self):
-        """
-        Report all attributes of this object as a dictionary that can be saved as a JSON
-        :return: A dictionary with key value to be saved in json format
-        """
-        return dict(chromosome_name=self.chromosome_name, start_position=self.start_position,
-                    end_position=self.end_position, all_candidates=self.all_candidates)
-
 
 class View:
     """
@@ -96,34 +78,6 @@ class View:
 
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
-
-    def write_json(self, start, end, all_candidate_lists):
-        """
-        Create a json output of all candidates found in the region
-        :param start: Candidate region start
-        :param end: Candidate region end
-        :param all_candidate_lists: Candidate list to be saved
-        :return:
-        """
-        if not os.path.exists(self.output_dir + "json_output/"):
-            os.mkdir(self.output_dir + "json_output/")
-        json_file = open(self.output_dir + "json_output/" + "Candidates" + '_' + self.chromosome_name + '_'
-                         + str(start) + '_' + str(end) + ".json", 'w')
-        json_file.write(json.dumps(all_candidate_lists.reprJSON(), cls=ComplexEncoder, indent=4, sort_keys=True))
-
-    def write_bed(self, start, end, bedTools_object):
-        """
-        Create a json output of all candidates found in the region
-        :param start: Candidate region start
-        :param end: Candidate region end
-        :param all_candidate_lists: Candidate list to be saved
-        :return:
-        """
-        if not os.path.exists(self.output_dir + "bed_output/"):
-            os.mkdir(self.output_dir + "bed_output/")
-
-        bedTools_object.saveas(self.output_dir + "bed_output/" + "Labeled_sites" + '_' +
-                               self.chromosome_name + '_'+ str(start) + '_' + str(end) + ".bed")
 
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
         """
@@ -159,13 +113,11 @@ class View:
 
         return labeled_sites
 
-    def parse_region(self, start_position, end_position, json_out):
+    def parse_region(self, start_position, end_position):
         """
         Find possible candidate windows.
         - All candidate lists
         """
-        if DEBUG_TIME_PROFILE:
-            start_time = time.time()
         reads = self.bam_handler.get_reads(chromosome_name=self.chromosome_name,
                                            start=start_position,
                                            stop=end_position)
@@ -205,37 +157,61 @@ class View:
             # add alleles to candidate
             all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles, del_alleles))
 
-        if json_out:
-            self.write_json(start_position, end_position, all_candidate_lists)
-
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
 
-        bed_file = BedHandler.list_to_bed(labeled_sites)
-        self.write_bed(start_position, end_position, bed_file)
+        return labeled_sites
 
-        if DEBUG_TIME_PROFILE:
-            end_time = time.time()
-            sys.stderr.write('TOTAL TIME: ' + str(end_time - start_time))
-
-    def test(self, json_out):
+    def test(self):
         """
         Run a test
-        :param json_out:
         :return:
         """
-        self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
+        self.parse_region(start_position=100000, end_position=200000)
 
 
-def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, max_threads):
+def write_bed(chromosome_name, bedTools_object, output_dir):
     """
-    Split chromosome in different ranges for parallel processing
-    :param chr_name: Chromosome name
-    :param bam_file: Bam file path
-    :param ref_file: Reference file path
-    :param output_dir: Directory for saving output
-    :param json_out: JSON out flag
-    :param max_threads: Maximum number of threads
+    Create a bed output of all candidates found in the region
+    :param start: Candidate region start
+    :param end: Candidate region end
+    :param all_candidate_lists: Candidate list to be saved
     :return:
+    """
+    if not os.path.exists(output_dir + "bed_output/"):
+        os.mkdir(output_dir + "bed_output/")
+    bedTools_object.saveas(output_dir + "bed_output/" + "Labeled_sites" + '_' + chromosome_name + ".bed")
+
+
+def parallel_run(args):
+    """
+    This method is run in parallel
+    :param args: Tuple containing arguments for parallelization
+    :return: Result got from that region
+    """
+    chr_name, bam_file, ref_file, output_dir, vcf_file, start_pos, end_pos = args
+
+    # create a view object
+    view_ob = View(chromosome_name=chr_name,
+                   bam_file_path=bam_file,
+                   reference_file_path=ref_file,
+                   output_file_path=output_dir,
+                   vcf_file_path=vcf_file)
+
+    # return the results
+    return view_ob.parse_region(start_pos, end_pos)
+
+
+def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads):
+    """
+    This method takes one chromosome name as parameter and chunks that chromosome in max_threads.
+    :param chr_name: Chromosome name
+    :param bam_file: Bam file
+    :param ref_file: Ref file
+    :param vcf_file: VCF file
+    :param json_out: If output as json or not
+    :param output_dir: Output directory
+    :param max_threads: Maximum number of threads
+    :return: A list of results returned by the processes
     """
     # entire length of chromosome
     fasta_handler = FastaHandler(ref_file)
@@ -243,18 +219,71 @@ def do_parallel(chr_name, bam_file, ref_file, vcf_file, json_out, output_dir, ma
 
     # expected length of each segment
     each_segment_length = int(math.ceil(whole_length / max_threads))
+    args = list()
 
     for i in range(max_threads):
         # parse window of the segment. Use a 1000 overlap for corner cases.
-        view = View(chromosome_name=chr_name,
-                    bam_file_path=bam_file,
-                    reference_file_path=ref_file,
-                    output_file_path=output_dir,
-                    vcf_file_path=vcf_file)
-        start_position = i*each_segment_length
-        end_position = (i+1) * each_segment_length + 1000
-        p = Process(target=view.parse_region, args=(start_position, end_position, json_out))
-        p.start()
+        start_position = i * each_segment_length
+        end_position = min((i + 1) * each_segment_length + 1000, whole_length)
+        args.append((chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position))
+
+    # create a pool of workers
+    pool = multiprocessing.Pool(processes=max_threads)
+
+    # run and get results of those threads
+    results = pool.map(parallel_run, args)
+
+    # wait for all the processes to finish
+    pool.join()
+
+    # return results
+    return results
+
+
+def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
+    """
+    This method calls chromosome_level_parallelization for each chromosome.
+    :param chr_name: Character name
+    :param bam_file: BAM file path
+    :param ref_file: Reference file path
+    :param vcf_file: VCF file path
+    :param json_out: JSON out parameter
+    :param output_dir: Output directory
+    :param max_threads: Maximum number of threads to create in chromosome level
+    :return: Saves a bed file
+    """
+    # chr_list = ["chr1", "chr2", "chr3", "chr4", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11",
+    #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
+    program_start_time = time.time()
+
+    chr_list = ["chr3"]
+
+    labeled_sites = []
+    # each chormosome in list
+    for chr in chr_list:
+        sys.stderr.write(TextColor.BLUE + "STARTING " + str(chr) + " PROCESSES" + "\n")
+        start_time = time.time()
+
+        # do a chromosome level parallelization
+        results = chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
+
+        # add all results to labeled sites
+        for result in results:
+            labeled_sites.extend(result)
+
+        end_time = time.time()
+        sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
+        sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time-start_time) + "\n")
+
+    sys.stderr.write(TextColor.BLUE + "CONVERTING TO BED FILE" + "\n")
+
+    bed_file = BedHandler.list_to_bed(labeled_sites)
+    write_bed("Whole_genome", bed_file, output_dir)
+
+    program_end_time = time.time()
+    sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCESSFULLY" + "\n")
+    sys.stderr.write(TextColor.CYAN + "TOTAL TIME FOR GENERATING ALL RESULTS: " + str(program_end_time-program_start_time) + "\n")
+
 
 
 if __name__ == '__main__':
@@ -284,7 +313,6 @@ if __name__ == '__main__':
     parser.add_argument(
         "--chromosome_name",
         type=str,
-        default="3",
         help="Desired chromosome number E.g.: 3"
     )
     parser.add_argument(
@@ -300,16 +328,10 @@ if __name__ == '__main__':
         help="If true then a dry test is run."
     )
     parser.add_argument(
-        "--json",
-        type=bool,
-        default=False,
-        help="If true then output will be in a json file in json folder."
-    )
-    parser.add_argument(
         "--output_dir",
         type=str,
         default="output/",
-        help="If true then output will be in a json file in json folder."
+        help="Path to output directory."
     )
 
     FLAGS, unparsed = parser.parse_known_args()
@@ -331,7 +353,9 @@ if __name__ == '__main__':
                     reference_file_path=FLAGS.ref,
                     output_file_path=FLAGS.output_dir,
                     vcf_file_path=FLAGS.vcf)
-        view.test(FLAGS.json)
+        view.test()
+    elif FLAGS.chromosome_name is not None:
+        chromosome_level_parallelization(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref,
+                                         FLAGS.vcf, FLAGS.output_dir, FLAGS.max_threads)
     else:
-        do_parallel(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.json,
-                    FLAGS.output_dir, FLAGS.max_threads)
+        genome_level_parallelization(FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.output_dir, FLAGS.max_threads)

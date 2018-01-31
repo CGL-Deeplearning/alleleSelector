@@ -1,6 +1,4 @@
-from collections import Counter,defaultdict
-
-'''
+"""
             possible combos:
             gt1       gt2     Candidate validated?
             --------------------------------------
@@ -22,7 +20,7 @@ from collections import Counter,defaultdict
             hom       het     NA
             None      None    NA
 
-'''
+"""
 PLOIDY = 2
 
 # DEBUG_FREQUENCIES = False
