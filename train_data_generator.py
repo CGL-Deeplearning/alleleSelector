@@ -217,11 +217,12 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     fasta_handler = FastaHandler(ref_file)
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
 
-    # chunk the chromosome into 1000 pieces
-    chunks = 1000
+    # 2MB segments at once
+    each_segment_length = 2000
 
-    # expected length of each segment
-    each_segment_length = int(math.ceil(whole_length / chunks))
+    # chunk the chromosome into 1000 pieces
+    chunks = int(math.ceil(whole_length / each_segment_length))
+
     args = list()
     results = list()
     for i in range(chunks):
