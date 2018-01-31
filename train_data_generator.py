@@ -216,9 +216,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     # entire length of chromosome
     fasta_handler = FastaHandler(ref_file)
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
-    whole_length = 8000000 # for testing purpose
 
-    chunks = 1000 # chunk the chromosome into 1000 pieces
+    # chunk the chromosome into 1000 pieces
+    chunks = 1000
 
     # expected length of each segment
     each_segment_length = int(math.ceil(whole_length / chunks))
@@ -244,6 +244,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
             pool.join()
 
             args = list()
+            sys.stderr.write(TextColor.CYAN + "Chunks completed: " + str(i) + "/" + str(chunks) + "\n")
 
     # return results
     return results
