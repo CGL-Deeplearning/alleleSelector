@@ -236,7 +236,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
             pool = multiprocessing.Pool(processes=max_threads)
 
             # run and get results of those threads
-            ret_vals = pool.map_async(parallel_run, args)
+            ret_vals = pool.map(parallel_run, args)
             for ret in ret_vals:
                 results.extend(ret)
 
