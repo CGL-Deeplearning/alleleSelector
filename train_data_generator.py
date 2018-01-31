@@ -185,13 +185,12 @@ class View:
         self.parse_region(start_position=100000, end_position=200000)
 
 
-def parallel_run(args):
+def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position):
     """
     This method is run in parallel
     :param args: Tuple containing arguments for parallelization
     :return: Result got from that region
     """
-    chr_name, bam_file, ref_file, output_dir, vcf_file, start_pos, end_pos = args
 
     # create a view object
     view_ob = View(chromosome_name=chr_name,
@@ -201,7 +200,7 @@ def parallel_run(args):
                    vcf_file_path=vcf_file)
 
     # return the results
-    view_ob.parse_region(start_pos, end_pos)
+    view_ob.parse_region(start_position, end_position)
 
 
 def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads):
