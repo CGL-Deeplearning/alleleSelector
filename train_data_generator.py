@@ -218,25 +218,32 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
     whole_length = 8000000 # for testing purpose
 
-    # expected length of each segment
-    each_segment_length = int(math.ceil(whole_length / max_threads))
-    args = list()
+    chunks = 1000 # chunk the chromosome into 1000 pieces
 
-    for i in range(max_threads):
+    # expected length of each segment
+    each_segment_length = int(math.ceil(whole_length / chunks))
+    args = list()
+    results = list()
+    for i in range(chunks):
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
-        end_position = min((i + 1) * each_segment_length + 1000, whole_length)
+        end_position = min((i + 1) * each_segment_length + 100, whole_length)
         args.append((chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position))
 
-    # create a pool of workers
-    pool = multiprocessing.Pool(processes=max_threads)
+        if i == chunks - 1 or (i + 1) % max_threads == 0:
+            # create a pool of workers
+            pool = multiprocessing.Pool(processes=max_threads)
 
-    # run and get results of those threads
-    results = pool.map(parallel_run, args)
+            # run and get results of those threads
+            ret_vals = pool.map(parallel_run, args)
+            for ret in ret_vals:
+                results.extend(ret)
 
-    # wait for all the processes to finish
-    pool.close()
-    pool.join()
+            # wait for all the processes to finish
+            pool.close()
+            pool.join()
+
+            args = list()
 
     # return results
     return results
@@ -260,18 +267,14 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
 
     chr_list = ["chr3"]
 
-    labeled_sites = []
+    labeled_sites = list()
     # each chormosome in list
     for chr in chr_list:
         sys.stderr.write(TextColor.BLUE + "STARTING " + str(chr) + " PROCESSES" + "\n")
         start_time = time.time()
 
         # do a chromosome level parallelization
-        results = chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
-
-        # add all results to labeled sites
-        for result in results:
-            labeled_sites.extend(result)
+        labeled_sites = chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
         end_time = time.time()
         sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
