@@ -79,6 +79,21 @@ class View:
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
 
+    def write_bed(self, start, end, bedTools_object):
+        """
+        Create a json output of all candidates found in the region
+        :param start: Candidate region start
+        :param end: Candidate region end
+        :param all_candidate_lists: Candidate list to be saved
+        :return:
+        """
+        path_to_dir = self.output_dir + "bed_output/" + self.chromosome_name + "/"
+        if not os.path.exists(path_to_dir):
+            os.mkdir(path_to_dir)
+
+        bedTools_object.saveas(path_to_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
+                               '_' + str(end) + ".bed")
+
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
         """
         Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
@@ -159,7 +174,8 @@ class View:
 
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
 
-        return labeled_sites
+        bed_file = BedHandler.list_to_bed(labeled_sites)
+        self.write_bed(start_position, end_position, bed_file)
 
     def test(self):
         """
@@ -167,19 +183,6 @@ class View:
         :return:
         """
         self.parse_region(start_position=100000, end_position=200000)
-
-
-def write_bed(chromosome_name, bedTools_object, output_dir):
-    """
-    Create a bed output of all candidates found in the region
-    :param start: Candidate region start
-    :param end: Candidate region end
-    :param all_candidate_lists: Candidate list to be saved
-    :return:
-    """
-    if not os.path.exists(output_dir + "bed_output/"):
-        os.mkdir(output_dir + "bed_output/")
-    bedTools_object.saveas(output_dir + "bed_output/" + "Labeled_sites" + '_' + chromosome_name + ".bed")
 
 
 def parallel_run(args):
@@ -198,7 +201,7 @@ def parallel_run(args):
                    vcf_file_path=vcf_file)
 
     # return the results
-    return view_ob.parse_region(start_pos, end_pos)
+    view_ob.parse_region(start_pos, end_pos)
 
 
 def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads):
@@ -213,8 +216,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     :param max_threads: Maximum number of threads
     :return: A list of results returned by the processes
     """
-    s_time = time.time()
-
     # entire length of chromosome
     fasta_handler = FastaHandler(ref_file)
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
@@ -225,33 +226,18 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     # chunk the chromosome into 1000 pieces
     chunks = int(math.ceil(whole_length / each_segment_length))
 
-    args = list()
-    results = list()
     for i in range(chunks):
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length + 10, whole_length)
-        args.append((chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position))
+        args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
+        p = multiprocessing.Process(target=parallel_run, args=args)
 
-        if i == chunks - 1 or (i + 1) % max_threads == 0:
-            # create a pool of workers
-            pool = multiprocessing.Pool(processes=max_threads)
+        while True:
+            if len(multiprocessing.active_children()) < max_threads:
+                break
 
-            # run and get results of those threads
-            ret_vals = pool.map(parallel_run, args)
-            for ret in ret_vals:
-                results.extend(ret)
-
-            # wait for all the processes to finish
-            pool.close()
-            pool.join()
-            args = list()
-            c_time = time.time()
-            sys.stderr.write(TextColor.CYAN + "Chunks: " + str(i+1) + "/" + str(chunks) + ", Percent: " +
-                             str(int(100 * (i+1)/chunks)) + "%, Time: " + str(round((c_time-s_time)/60, 2)) + "mins\n")
-
-    # return results
-    return results
+        p.start()
 
 
 def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
@@ -272,23 +258,17 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
 
     # chr_list = ["chr3"]
 
-    labeled_sites = list()
     # each chormosome in list
     for chr in chr_list:
         sys.stderr.write(TextColor.BLUE + "STARTING " + str(chr) + " PROCESSES" + "\n")
         start_time = time.time()
 
         # do a chromosome level parallelization
-        labeled_sites = chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
+        chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
         end_time = time.time()
         sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
         sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time-start_time) + "\n")
-
-    sys.stderr.write(TextColor.BLUE + "CONVERTING TO BED FILE" + "\n")
-
-    bed_file = BedHandler.list_to_bed(labeled_sites)
-    write_bed("Whole_genome", bed_file, output_dir)
 
     program_end_time = time.time()
     sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCESSFULLY" + "\n")
