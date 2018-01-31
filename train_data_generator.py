@@ -213,6 +213,8 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     :param max_threads: Maximum number of threads
     :return: A list of results returned by the processes
     """
+    s_time = time.time()
+
     # entire length of chromosome
     fasta_handler = FastaHandler(ref_file)
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
@@ -245,8 +247,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
             pool.join()
 
             args = list()
-            sys.stderr.write(TextColor.CYAN + "Chunks completed: " + str(i+1) + "/" + str(chunks)
-                             + " Percent completed: " + str(int(100 * (i+1)/chunks)) + "%\n")
+            c_time = time.time()
+            sys.stderr.write(TextColor.CYAN + "Chunks: " + str(i+1) + "/" + str(chunks) + ", Percent: " +
+                             str(int(100 * (i+1)/chunks)) + ", Time: " + str(c_time-s_time) + "%\n")
 
     # return results
     return results
