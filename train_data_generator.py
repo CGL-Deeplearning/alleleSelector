@@ -243,9 +243,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
                 results.extend(ret)
 
             # wait for all the processes to finish
-            pool.close()
-            pool.join()
-
+            # pool.close()
+            # pool.join()
+            time.sleep(5)
             args = list()
             c_time = time.time()
             sys.stderr.write(TextColor.CYAN + "Chunks: " + str(i+1) + "/" + str(chunks) + ", Percent: " +
