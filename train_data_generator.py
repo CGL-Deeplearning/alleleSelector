@@ -220,7 +220,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
 
     # 2MB segments at once
-    each_segment_length = 40000
+    each_segment_length = 20000
 
     # chunk the chromosome into 1000 pieces
     chunks = int(math.ceil(whole_length / each_segment_length))
@@ -243,12 +243,12 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
                 results.extend(ret)
 
             # wait for all the processes to finish
-            # pool.close()
-            # pool.join()
+            pool.close()
+            pool.join()
             args = list()
             c_time = time.time()
             sys.stderr.write(TextColor.CYAN + "Chunks: " + str(i+1) + "/" + str(chunks) + ", Percent: " +
-                             str(int(100 * (i+1)/chunks)) + "%, Time: " + str(round(c_time-s_time,2)/60) + "mins\n")
+                             str(int(100 * (i+1)/chunks)) + "%, Time: " + str(round((c_time-s_time)/60, 2)) + "mins\n")
 
     # return results
     return results
@@ -266,11 +266,11 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
     :param max_threads: Maximum number of threads to create in chromosome level
     :return: Saves a bed file
     """
-    # chr_list = ["chr1", "chr2", "chr3", "chr4", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11",
-    #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
+    chr_list = ["chr1", "chr2", "chr3", "chr4", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11",
+                "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    chr_list = ["chr3"]
+    # chr_list = ["chr3"]
 
     labeled_sites = list()
     # each chormosome in list
