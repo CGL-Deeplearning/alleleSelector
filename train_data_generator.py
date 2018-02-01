@@ -235,7 +235,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         # print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
         p = multiprocessing.Process(target=parallel_run, args=args)
         p.start()
-        p.join()
 
         while True:
             if len(multiprocessing.active_children()) < max_threads:
