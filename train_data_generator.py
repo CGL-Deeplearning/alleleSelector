@@ -239,7 +239,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 
         p.start()
         while True:
-            if len(multiprocessing.active_children()) > 0:
+            if len(multiprocessing.active_children()) == 0:
                 break
         print("-----------------------")
 
