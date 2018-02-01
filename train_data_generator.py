@@ -180,7 +180,7 @@ class View:
         Run a test
         :return:
         """
-        self.parse_region(start_position=100000, end_position=200000)
+        self.parse_region(start_position=121400000, end_position=121600000)
 
 
 def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position):
