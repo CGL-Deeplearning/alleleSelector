@@ -20,7 +20,8 @@ DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
 MIN_MISMATCH_THRESHOLD = 2
-
+MIN_MISMATCH_PERCENT_THRESHOLD = 2
+MIN_COVERAGE_THRESHOLD = 10
 
 class CandidateFinder:
     """
@@ -223,7 +224,10 @@ class CandidateFinder:
 
             for pos in candidate_positions:
                 if self.region_start_position <= pos <= self.region_end_position:
-                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD:
+                    percent_mismatch = int((self.mismatch_count[pos]*100) / self.coverage[pos])
+                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
+                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD and \
+                            self.coverage[pos] > MIN_COVERAGE_THRESHOLD:
                         yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
