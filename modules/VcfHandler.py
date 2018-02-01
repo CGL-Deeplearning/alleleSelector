@@ -12,9 +12,10 @@ position.
 - get_variant_dictionary() is called to get the dictionary
 """
 
+# we are treating SNPs and DELs as single
 SNP = 0
+DEL = 0
 IN = 1
-DEL = 2
 HOM = 0
 HET = 1
 HOM_ALT = 2
@@ -74,7 +75,7 @@ class VCFRecord:
         :return: String to print
         """
         return_str = str(self.rec_pos) + '\t' + str(int(self.rec_qual)) + '\t' + str(self.rec_genotype) + '\t' \
-                     + str(self.rec_filter) +'\t' + str(self.rec_not_hom) + '\t' + str(self.rec_alleles) + '\t' \
+                     + str(self.rec_filter) + '\t' + str(self.rec_not_hom) + '\t' + str(self.rec_alleles) + '\t' \
                      + str(self.rec_alts)
         return return_str
 
@@ -299,24 +300,6 @@ class VCFFileProcessor:
         :return:
         """
         return self.genotype_dictionary
-
-    def test_filtered_records(self):
-        """
-        Test method of the variant dictionary.
-        Create a VariantFile and return it
-        :return:
-        """
-        # Create a new VariantFile
-        vcf_out = pysam.VariantFile('-', 'w')
-        # Get the filtered records
-        filtered_records = self._get_filtered_records()
-
-        # Add all records to the file
-        for record in filtered_records:
-            vcf_out.write(record)
-
-        # Return the file
-        return vcf_out
 
     def populate_dictionary(self, contig, start_pos, end_pos, hom_filter):
         """

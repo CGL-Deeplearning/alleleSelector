@@ -13,9 +13,9 @@ from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
 from modules.BedHandler import BedHandler
 from modules.TextColor import TextColor
-
+from modules.FileManager import FileManager
 """
-alignmentPolish finds possible variant sites in given bam file.
+alleleSelector finds possible variant sites in given bam file.
 
 It requires three parameters:
 - bam_file_path: path to a bam file
@@ -59,7 +59,7 @@ class AllCandidatesInRegion:
     def add_candidate_to_list(self, alignment_candidates_tuple):
         """
         Add a candidate to the list
-        :param alignment_candidates_object: Candidate object to add
+        :param alignment_candidates_tuple: Candidate tuple to add
         :return:
         """
         self.all_candidates.append(alignment_candidates_tuple)
@@ -81,13 +81,13 @@ class View:
 
     def write_bed(self, start, end, bedTools_object):
         """
-        Create a json output of all candidates found in the region
+        Create a bed output of all candidates found in the region
         :param start: Candidate region start
         :param end: Candidate region end
-        :param all_candidate_lists: Candidate list to be saved
+        :param bedTools_object: bedtools object that'll be converted to a bed file
         :return:
         """
-        path_to_dir = self.output_dir + "bed_output/" + self.chromosome_name + "/"
+        path_to_dir = self.output_dir + self.chromosome_name + "/"
         if not os.path.exists(path_to_dir):
             os.mkdir(path_to_dir)
 
@@ -97,7 +97,7 @@ class View:
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
         """
         Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
-        :param candidate_dictionary: dictionary with the list of allele sites under the top-level entry "all_candidates"
+        :param AllCandidatesInRegion_object: AllCandidatesInRegion object containing dictionary of all candidates
         :param filter_hom_ref: whether to ignore hom_ref VCF records during candidate validation
         :return: labeled_sites: the parsed candidate list with the following structure for each entry:
 
@@ -164,13 +164,13 @@ class View:
             # generate base dictionaries
             allele_finder.generate_base_dictionaries()
             # generate candidate allele list
-            in_alleles, snp_alleles, del_alleles = allele_finder.generate_candidate_allele_list()
+            in_alleles, snp_alleles = allele_finder.generate_candidate_allele_list()
 
             if DEBUG_PRINT_CANDIDATES:
-                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles, 'DELs', del_alleles)
+                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles)
 
             # add alleles to candidate
-            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles, del_alleles))
+            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles))
 
         labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
 
@@ -187,9 +187,15 @@ class View:
 
 def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position):
     """
-    This method is run in parallel
-    :param args: Tuple containing arguments for parallelization
-    :return: Result got from that region
+    Run this method in parallel
+    :param chr_name: Chromosome name
+    :param bam_file: Bam file path
+    :param ref_file: Ref file path
+    :param output_dir: Output directory
+    :param vcf_file: VCF file path
+    :param start_position: Start position
+    :param end_position: End position
+    :return:
     """
 
     # create a view object
@@ -210,7 +216,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     :param bam_file: Bam file
     :param ref_file: Ref file
     :param vcf_file: VCF file
-    :param json_out: If output as json or not
     :param output_dir: Output directory
     :param max_threads: Maximum number of threads
     :return: A list of results returned by the processes
@@ -242,11 +247,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
     """
     This method calls chromosome_level_parallelization for each chromosome.
-    :param chr_name: Character name
     :param bam_file: BAM file path
     :param ref_file: Reference file path
     :param vcf_file: VCF file path
-    :param json_out: JSON out parameter
     :param output_dir: Output directory
     :param max_threads: Maximum number of threads to create in chromosome level
     :return: Saves a bed file
@@ -265,14 +268,47 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
         # do a chromosome level parallelization
         chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
+        # here we dumped all the bed files
+        path_to_dir = output_dir + chr + "/"
+        concatenated_file_name = output_dir + chr + "/" + chr + "_labeled.bed"
+        filemanager_object = FileManager()
+        # get all bed file paths from the directory
+        file_paths = filemanager_object.get_file_paths_from_directory(path_to_dir)
+        # dump all bed files into one
+        filemanager_object.concatenate_files(file_paths, concatenated_file_name)
+        # delete all temporary files
+        filemanager_object.delete_files(file_paths)
+
         end_time = time.time()
         sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
-        sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time-start_time) + "\n")
+        sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time - start_time) + "\n")
 
     program_end_time = time.time()
-    sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCESSFULLY" + "\n")
+    sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCCESSFULLY" + "\n")
     sys.stderr.write(TextColor.CYAN + "TOTAL TIME FOR GENERATING ALL RESULTS: " + str(program_end_time-program_start_time) + "\n")
 
+
+def handle_output_directory(output_dir):
+    """
+    Process the output directory and return a valid directory where we save the output
+    :param output_dir: Output directory path
+    :return:
+    """
+    # process the output directory
+    if output_dir[-1] != "/":
+        output_dir += "/"
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    # create an internal directory so we don't overwrite previous runs
+    timestr = time.strftime("%m%d%Y_%H%M%S")
+    internal_directory = "run_" + timestr + "/"
+    output_dir = output_dir + internal_directory
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    return output_dir
 
 
 if __name__ == '__main__':
@@ -324,11 +360,7 @@ if __name__ == '__main__':
     )
 
     FLAGS, unparsed = parser.parse_known_args()
-    # process the output directory
-    if FLAGS.output_dir[-1] != '/':
-        FLAGS.output_dir += '/'
-    if not os.path.exists(FLAGS.output_dir):
-        os.mkdir(FLAGS.output_dir)
+    FLAGS.output_dir = handle_output_directory(FLAGS.output_dir)
 
     view = View(chromosome_name=FLAGS.chromosome_name,
                 bam_file_path=FLAGS.bam,
