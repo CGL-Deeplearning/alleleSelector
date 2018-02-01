@@ -243,6 +243,11 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 
         p.start()
 
+    # wait for the last process to end before file processing
+    while True:
+        if len(multiprocessing.active_children()) == 0:
+            break
+
 
 def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
     """
