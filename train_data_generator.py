@@ -173,6 +173,8 @@ class View:
         bed_file = BedHandler.list_to_bed(labeled_sites)
         self.write_bed(start_position, end_position, bed_file)
 
+        print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
+
     def test(self):
         """
         Run a test
@@ -232,7 +234,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         end_position = min((i + 1) * each_segment_length + 10, whole_length)
         args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
         # sys.stderr.write("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
-        # print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
+        print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
         p = multiprocessing.Process(target=parallel_run, args=args)
         p.start()
 
