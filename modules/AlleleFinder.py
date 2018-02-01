@@ -15,7 +15,7 @@ Finds allele in a given window. The window is a candidate window where a variant
     - Goes through all the reads and creates alleles that are possible candidates
 """
 
-PLOIDY = 4
+PLOIDY = 2
 
 
 class CandidateInformation:
