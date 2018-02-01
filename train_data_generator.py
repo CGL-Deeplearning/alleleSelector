@@ -172,8 +172,6 @@ class View:
 
         bed_file = BedHandler.list_to_bed(labeled_sites)
         self.write_bed(start_position, end_position, bed_file)
-        sys.stderr.write("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
-        print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
 
     def test(self):
         """
@@ -223,7 +221,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
 
     # 2MB segments at once
-    each_segment_length = 20000
+    each_segment_length = 200000
 
     # chunk the chromosome into 1000 pieces
     chunks = int(math.ceil(whole_length / each_segment_length))
@@ -236,12 +234,10 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         sys.stderr.write("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
         print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
         p = multiprocessing.Process(target=parallel_run, args=args)
-
         p.start()
-        while True:
-            if len(multiprocessing.active_children()) == 0:
-                break
-        print("-----------------------")
+        p.join()
+        sys.stderr.write("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
+        print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
 
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
