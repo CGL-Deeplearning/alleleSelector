@@ -1,6 +1,4 @@
-from collections import Counter,defaultdict
-
-'''
+"""
             possible combos:
             gt1       gt2     Candidate validated?
             --------------------------------------
@@ -22,7 +20,7 @@ from collections import Counter,defaultdict
             hom       het     NA
             None      None    NA
 
-'''
+"""
 PLOIDY = 2
 
 # DEBUG_FREQUENCIES = False
@@ -33,10 +31,9 @@ START = 0
 STOP = 1
 IN_ALLELES = 2
 SNP_ALLELES = 3
-DEL_ALLELES = 4
 
 # Positional vcf indexes
-SNP,IN,DEL = 0,1,2
+SNP, IN, DEL = 0, 1, 2
 SNP_DEL = 3
 
 # VCF record indexes
@@ -113,7 +110,7 @@ class CandidateLabeler:
 
         return gt
 
-    def _get_all_genotype_labels(self, positional_vcf, start, stop, ref_seq, alleles_snp, alleles_insert, alleles_del):
+    def _get_all_genotype_labels(self, positional_vcf, start, stop, ref_seq, alleles_snp, alleles_insert):
         """
         Create a list of dictionaries of 3 types of alleles that can be in a position.
 
@@ -128,7 +125,6 @@ class CandidateLabeler:
         :return: Dictionary of genotypes
         """
         gts_in = list()
-        gts_del = list()
         gts_snp = list()
 
         for alt in alleles_insert:
@@ -139,11 +135,7 @@ class CandidateLabeler:
             gt_snp = self.get_label_of_allele(positional_vcf, SNP, (start, stop, ref_seq, alt))
             gts_snp.append(gt_snp)
 
-        for alt in alleles_del:
-            gt_del = self.get_label_of_allele(positional_vcf, DEL, (start, stop, ref_seq, alt))
-            gts_del.append(gt_del)
-
-        return [gts_snp, gts_in, gts_del]
+        return [gts_snp, gts_in]
 
     @staticmethod
     def _is_supported(genotypes):
@@ -179,7 +171,7 @@ class CandidateLabeler:
 
         return in_supported or del_supported or snp_supported
 
-    def _generate_list(self, chromosome_name, start, stop, alleles_snp, alleles_in, alleles_del, ref_seq, genotypes):
+    def _generate_list(self, chromosome_name, start, stop, alleles_snp, alleles_in, ref_seq, genotypes):
         """
         Generate a list of attributes that can be saved of a labeled candidate
         :param chromosome_name: Name of chromosome
@@ -196,8 +188,6 @@ class CandidateLabeler:
             all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[SNP][i]])
         for i, allele in enumerate(alleles_in):
             all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[IN][i]])
-        for i, allele in enumerate(alleles_del):
-            all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[DEL][i]])
 
         return all_candidates
 
@@ -220,7 +210,6 @@ class CandidateLabeler:
             allele_stop = candidate_site[STOP]
             alleles_insert = candidate_site[IN_ALLELES]
             alleles_snp = candidate_site[SNP_ALLELES]
-            alleles_del = candidate_site[DEL_ALLELES]
 
             ref_sequence = self.fasta_handler.get_sequence(chromosome_name=chromosome_name,
                                                            start=allele_start,
@@ -232,36 +221,18 @@ class CandidateLabeler:
                                                       stop=allele_stop,
                                                       ref_seq=ref_sequence,
                                                       alleles_snp=alleles_snp,
-                                                      alleles_insert=alleles_insert,
-                                                      alleles_del=alleles_del)
+                                                      alleles_insert=alleles_insert)
 
             # get a list of attributes that can be saved
             all_labeled_candidates.extend(self._generate_list(chromosome_name, allele_start, allele_stop, alleles_snp,
-                                                              alleles_insert, alleles_del, ref_sequence, genotypes))
+                                                              alleles_insert, ref_sequence, genotypes))
 
             if DEBUG_PRINT_ALL:
                 print()
                 print(allele_start, allele_stop, ref_sequence)
                 print("snp alleles:        ", alleles_snp)
                 print("insert alleles: ", alleles_insert)
-                print("delete alleles: ", alleles_del)
                 print("insert gts:     ", genotypes[IN])
-                print("del gts:        ", genotypes[DEL])
                 print("snp gts:        ", genotypes[SNP])
-
-            # test if the site has any true variants (not Hom)
-            # if self._is_position_supported(genotypes):
-            #     if allele_start in validated_vcf_positions:
-            #         validated_vcf_positions[allele_start] = 1
-
-        # see if any sites weren't supported by candidates
-        # n_unsupported = 0
-        # for pos in validated_vcf_positions:
-        #     if validated_vcf_positions[pos] == 0:
-        #         n_unsupported += 1
-        #         print("\nWARNING: Unsupported VCF position: ", pos)
-        #         print("\tRecord: ", positional_vcf[pos])
-
-        # print("missed vcf positions: ", float(len(positional_vcf))/n_unsupported)
 
         return all_labeled_candidates
