@@ -231,13 +231,17 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length + 10, whole_length)
         args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
-        sys.stderr.write("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
-        print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
+        # sys.stderr.write("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
+        # print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
         p = multiprocessing.Process(target=parallel_run, args=args)
         p.start()
         p.join()
-        sys.stderr.write("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
-        print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
+
+        while True:
+            if len(multiprocessing.active_children()) < max_threads:
+                break
+        # sys.stderr.write("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
+        # print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
 
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
