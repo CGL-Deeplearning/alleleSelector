@@ -87,11 +87,7 @@ class View:
         :param bedTools_object: bedtools object that'll be converted to a bed file
         :return:
         """
-        path_to_dir = self.output_dir + self.chromosome_name + "/"
-        if not os.path.exists(path_to_dir):
-            os.mkdir(path_to_dir)
-
-        bedTools_object.saveas(path_to_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
+        bedTools_object.saveas(self.output_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
                                '_' + str(end) + ".bed")
 
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
@@ -261,6 +257,7 @@ def create_output_dir_for_chromosome(output_dir, chr_name):
         os.mkdir(path_to_dir)
 
     return path_to_dir
+
 
 def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
     """
