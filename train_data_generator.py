@@ -87,11 +87,7 @@ class View:
         :param bedTools_object: bedtools object that'll be converted to a bed file
         :return:
         """
-        path_to_dir = self.output_dir + self.chromosome_name + "/"
-        if not os.path.exists(path_to_dir):
-            os.mkdir(path_to_dir)
-
-        bedTools_object.saveas(path_to_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
+        bedTools_object.saveas(self.output_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
                                '_' + str(end) + ".bed")
 
     def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
@@ -243,6 +239,25 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 
         p.start()
 
+    # wait for the last process to end before file processing
+    while True:
+        if len(multiprocessing.active_children()) == 0:
+            break
+
+
+def create_output_dir_for_chromosome(output_dir, chr_name):
+    """
+    Create an internal directory inside the output directory to dump choromosomal bed files
+    :param output_dir: Path to output directory
+    :param chr_name: chromosome name
+    :return: New directory path
+    """
+    path_to_dir = output_dir + chr_name + "/"
+    if not os.path.exists(path_to_dir):
+        os.mkdir(path_to_dir)
+
+    return path_to_dir
+
 
 def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
     """
@@ -258,19 +273,22 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
                 "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    # chr_list = ["chr3"]
+    # chr_list = ["chr22"]
 
     # each chormosome in list
     for chr in chr_list:
         sys.stderr.write(TextColor.BLUE + "STARTING " + str(chr) + " PROCESSES" + "\n")
         start_time = time.time()
 
+        # create dump directory inside output directory
+        output_dir = create_output_dir_for_chromosome(output_dir, chr)
+
         # do a chromosome level parallelization
         chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
         # here we dumped all the bed files
-        path_to_dir = output_dir + chr + "/"
-        concatenated_file_name = output_dir + chr + "/" + chr + "_labeled.bed"
+        path_to_dir = output_dir
+        concatenated_file_name = output_dir + chr + "_labeled.bed"
         filemanager_object = FileManager()
         # get all bed file paths from the directory
         file_paths = filemanager_object.get_file_paths_from_directory(path_to_dir)
