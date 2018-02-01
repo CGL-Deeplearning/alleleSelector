@@ -239,11 +239,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
 
         p.start()
 
-    # wait for the last process to end before file processing
-    while True:
-        if len(multiprocessing.active_children()) == 0:
-            break
-
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
     """
@@ -286,6 +281,16 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
         # do a chromosome level parallelization
         chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
+        end_time = time.time()
+        sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
+        sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time - start_time) + "\n")
+
+    # wait for the last process to end before file processing
+    while True:
+        if len(multiprocessing.active_children()) == 0:
+            break
+
+    for chr in chr_list:
         # here we dumped all the bed files
         path_to_dir = output_dir
         concatenated_file_name = output_dir + chr + "_labeled.bed"
@@ -296,10 +301,6 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
         filemanager_object.concatenate_files(file_paths, concatenated_file_name)
         # delete all temporary files
         filemanager_object.delete_files(file_paths)
-
-        end_time = time.time()
-        sys.stderr.write(TextColor.PURPLE + "FINISHED " + str(chr) + " PROCESSES" + "\n")
-        sys.stderr.write(TextColor.CYAN + "TIME ELAPSED: " + str(end_time - start_time) + "\n")
 
     program_end_time = time.time()
     sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCCESSFULLY" + "\n")
