@@ -180,7 +180,7 @@ class CandidateFinder:
         self.edit_count[alignment_position] += 1
         self.candidates_by_read[alignment_position].append(read_name)
         self.mismatch_count[alignment_position] += 1
-        self._update_insert_dictionary(alignment_position, read_sequence)
+        self._update_insert_dictionary(alignment_position, self.reference_dictionary[alignment_position] + read_sequence)
         yield alignment_position
 
     def _select_alleles(self, position):
