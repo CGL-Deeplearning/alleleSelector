@@ -134,7 +134,7 @@ class View:
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 
 
-def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position):
+def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position, MIN_MISMATCH_PERCENT_THRESHOLD):
     """
     Run this method in parallel
     :param chr_name: Chromosome name
@@ -152,13 +152,14 @@ def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_posit
                    bam_file_path=bam_file,
                    reference_file_path=ref_file,
                    output_file_path=output_dir,
-                   vcf_file_path=vcf_file)
+                   vcf_file_path=vcf_file,
+                   MIN_MISMATCH_PERCENT_THRESHOLD=MIN_MISMATCH_PERCENT_THRESHOLD)
 
     # return the results
     view_ob.parse_region(start_position, end_position)
 
 
-def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads):
+def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads, MIN_MISMATCH_PERCENT_THRESHOLD):
     """
     This method takes one chromosome name as parameter and chunks that chromosome in max_threads.
     :param chr_name: Chromosome name
@@ -183,7 +184,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length, whole_length)
-        args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
+        args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position, MIN_MISMATCH_PERCENT_THRESHOLD)
 
         p = multiprocessing.Process(target=parallel_run, args=args)
         p.start()
