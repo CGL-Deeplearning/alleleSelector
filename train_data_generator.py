@@ -41,7 +41,7 @@ class View:
     """
     Works as a main class and handles user interaction with different modules.
     """
-    def __init__(self, chromosome_name, bam_file_path, reference_file_path, output_file_path, vcf_file_path):
+    def __init__(self, chromosome_name, bam_file_path, reference_file_path, output_file_path, vcf_file_path, MIN_MISMATCH_PERCENT_THRESHOLD):
         # --- initialize handlers ---
         self.bam_handler = BamHandler(bam_file_path)
         self.fasta_handler = FastaHandler(reference_file_path)
@@ -50,6 +50,7 @@ class View:
 
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
+        self.MIN_MISMATCH_PERCENT_THRESHOLD = MIN_MISMATCH_PERCENT_THRESHOLD
 
     def write_bed(self, start, end, bedTools_object):
         """
@@ -105,7 +106,8 @@ class View:
                                            fasta_handler=self.fasta_handler,
                                            chromosome_name=self.chromosome_name,
                                            region_start_position=start_position,
-                                           region_end_position=end_position)
+                                           region_end_position=end_position,
+                                           MIN_MISMATCH_PERCENT_THRESHOLD=self.MIN_MISMATCH_PERCENT_THRESHOLD)
 
         # go through each read and find candidate positions and alleles
         selected_candidates = candidate_finder.parse_reads_and_select_candidates(reads=reads)
@@ -189,7 +191,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         while True:
             if len(multiprocessing.active_children()) < max_threads:
                 break
-
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
     """
@@ -328,6 +329,13 @@ if __name__ == '__main__':
         default="output/",
         help="Path to output directory."
     )
+    parser.add_argument(
+        "--edit_threshold",
+        type=int,
+        default=1,
+        help="Percent frequency threshold for a candidate site to be considered."
+    )
+
 
     FLAGS, unparsed = parser.parse_known_args()
     FLAGS.output_dir = handle_output_directory(FLAGS.output_dir)
@@ -336,14 +344,16 @@ if __name__ == '__main__':
                 bam_file_path=FLAGS.bam,
                 reference_file_path=FLAGS.ref,
                 output_file_path=FLAGS.output_dir,
-                vcf_file_path=FLAGS.vcf)
+                vcf_file_path=FLAGS.vcf,
+                MIN_MISMATCH_PERCENT_THRESHOLD=FLAGS.edit_threshold)
 
     if FLAGS.test is True:
         view = View(chromosome_name=FLAGS.chromosome_name,
                     bam_file_path=FLAGS.bam,
                     reference_file_path=FLAGS.ref,
                     output_file_path=FLAGS.output_dir,
-                    vcf_file_path=FLAGS.vcf)
+                    vcf_file_path=FLAGS.vcf,
+                    MIN_MISMATCH_PERCENT_THRESHOLD=FLAGS.edit_threshold)
         view.test()
     elif FLAGS.chromosome_name is not None:
         chromosome_level_parallelization(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref,

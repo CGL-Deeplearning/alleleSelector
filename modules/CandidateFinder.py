@@ -20,8 +20,8 @@ MERGE_WINDOW_DISTANCE we merge them in a single window.
 DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
-MIN_MISMATCH_THRESHOLD = 2
-MIN_MISMATCH_PERCENT_THRESHOLD = 2
+MIN_MISMATCH_THRESHOLD = 0
+# MIN_MISMATCH_PERCENT_THRESHOLD = 2
 MIN_COVERAGE_THRESHOLD = 10
 PLOIDY = 2
 
@@ -31,7 +31,7 @@ class CandidateFinder:
     Given reads that align to a site and a pointer to the reference fasta file handler,
     candidate finder finds possible variant candidates_by_read of that site.
     """
-    def __init__(self, reads, fasta_handler, chromosome_name, region_start_position, region_end_position):
+    def __init__(self, reads, fasta_handler, chromosome_name, region_start_position, region_end_position, MIN_MISMATCH_PERCENT_THRESHOLD):
         """
         Initialize a candidate finder object.
         :param reads: Reads that align to the site
@@ -57,6 +57,8 @@ class CandidateFinder:
         self.snp_dictionary = {}
         self.insert_dictionary = {}
         self.reference_dictionary = {}
+
+        self.MIN_MISMATCH_PERCENT_THRESHOLD = MIN_MISMATCH_PERCENT_THRESHOLD
 
     def print_positions(self):
         for pos in sorted(self.candidate_positions):
@@ -285,7 +287,7 @@ class CandidateFinder:
                 if self.region_start_position <= pos <= self.region_end_position:
                     percent_mismatch = int((self.mismatch_count[pos]*100) / self.coverage[pos])
                     if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
-                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD and \
+                        percent_mismatch > self.MIN_MISMATCH_PERCENT_THRESHOLD and \
                             self.coverage[pos] > MIN_COVERAGE_THRESHOLD:
                         yield pos
 
