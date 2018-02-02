@@ -1,4 +1,5 @@
 from collections import defaultdict
+import operator
 
 """
 CandidateFinder finds possible positions based on edits we see in reads.
@@ -20,6 +21,9 @@ DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
 MIN_MISMATCH_THRESHOLD = 2
+MIN_MISMATCH_PERCENT_THRESHOLD = 2
+MIN_COVERAGE_THRESHOLD = 10
+PLOIDY = 2
 
 
 class CandidateFinder:
@@ -48,20 +52,15 @@ class CandidateFinder:
         self.mismatch_count = defaultdict(int)
         self.edit_count = defaultdict(int)
         self.candidate_positions = set()
-        # all merged windows
-        self.merged_windows = []
+
+        # the base and the insert dictionary for finding alleles
+        self.snp_dictionary = {}
+        self.insert_dictionary = {}
+        self.reference_dictionary = {}
 
     def print_positions(self):
         for pos in sorted(self.candidate_positions):
             print(pos, self.edit_count[pos], self.coverage[pos])
-
-    def print_windows(self):
-        print('Total windows: ', len(self.merged_windows))
-        for window in self.merged_windows:
-            print(window[0], window[1], window[2])
-
-    def get_candidate_windows(self):
-        return self.merged_windows
 
     @staticmethod
     def get_read_stop_position(read):
@@ -85,33 +84,34 @@ class CandidateFinder:
 
         return ref_alignment_stop
 
-    def merge_positions(self):
+    def _update_snp_dictionary(self, pos, allele):
         """
-        Merge candidate positions we discovered in candidate positions set.
-        If two positions are within a window they are merged in one window.
-
-        This method updates merged_windows list where each entry is:
-        (chromosome_name, start_position, end_position)
+        Update the snp dictionary with allele frequency in a position
+        :param pos: Position
+        :param allele: Allele at that position
         :return:
         """
-        start_pos = -1
-        end_pos = -1
-        for pos in sorted(self.candidate_positions):
-            if start_pos == -1 and end_pos == -1:
-                start_pos = pos
-                end_pos = pos
-            # if position is within window from previous position
-            elif end_pos + MERGE_WINDOW_DISTANCE >= pos:
-                end_pos = pos
-            # else call it a window and start a new window
-            else:
-                self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
-                start_pos = pos
-                end_pos = pos
+        if pos not in self.snp_dictionary:
+            self.snp_dictionary[pos] = {}
+        if allele not in self.snp_dictionary[pos]:
+            self.snp_dictionary[pos][allele] = 0
 
-        # if a window was left open inside loop
-        if start_pos != -1:
-            self.merged_windows.append((self.chromosome_name, start_pos - MERGE_WINDOW_OFFSET, end_pos + MERGE_WINDOW_OFFSET))
+        self.snp_dictionary[pos][allele] += 1
+
+    def _update_insert_dictionary(self, pos, allele):
+        """
+        Update insert dictionary with allele frequency in a position
+        :param pos: Position
+        :param allele: Insert allele at that position
+        :return:
+        """
+        if pos not in self.insert_dictionary:
+            self.insert_dictionary[pos] = {}
+
+        if allele not in self.insert_dictionary[pos]:
+            self.insert_dictionary[pos][allele] = 0
+
+        self.insert_dictionary[pos][allele] += 1
 
     def parse_match(self, alignment_position, length, read_sequence, ref_sequence, read_name):
         """
@@ -119,21 +119,28 @@ class CandidateFinder:
         :param alignment_position: Position where this match happened
         :param read_sequence: Read sequence
         :param ref_sequence: Reference sequence
+        :param length: Length of the operation
         :param read_name: Read ID that we need to save
         :return:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        offset = 0
         start = alignment_position
         stop = start + length
         for i in range(start, stop):
             self.coverage[i] += 1
             if read_sequence[i-alignment_position] != ref_sequence[i-alignment_position]:
-                self.mismatch_count[i+offset] += 1
-                self.edit_count[i+offset] += 1
-                self.candidates_by_read[i+offset].append(read_name)
-                yield i+offset
+                # it's a true mismatch to the reference
+                # update the base dictionary
+                self._update_snp_dictionary(i, read_sequence[i-alignment_position])
+                # increase mismatch count
+                self.mismatch_count[i] += 1
+                # increase the edit count
+                self.edit_count[i] += 1
+                # update the candidates by read list
+                self.candidates_by_read[i].append(read_name)
+                # yield the position to be added to the candidate positions
+                yield i
 
     def parse_delete(self, alignment_position, length, read_name):
         """
@@ -145,20 +152,26 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
-        start = alignment_position + 1 # actual delete position starts one after the anchor
+        # actual delete position starts one after the anchor
+        start = alignment_position + 1
         stop = start + length
-        # print('Delete', start, stop)
+
         for i in range(start, stop):
+            # update the base dictionary
+            self._update_snp_dictionary(i, "*")
+            # increase the mismatch count
             self.mismatch_count[i] += 1
+            # increase the coverage
             self.coverage[i] += 1
+            # append the read name to candidate read list
             self.candidates_by_read[i].append(read_name)
             yield i
 
-    def parse_insert(self, alignment_position, length, read_name):
+    def parse_insert(self, alignment_position, read_sequence, read_name):
         """
         Process a cigar operation where there is an insert
-        :param alignment_position: Position where the insert happpened
-        :param length: Length of the insert
+        :param alignment_position: Position where the insert happened
+        :param read_sequence: The insert read sequence
         :param read_name: Read Id that we need to save
         :return:
 
@@ -167,9 +180,36 @@ class CandidateFinder:
         self.edit_count[alignment_position] += 1
         self.candidates_by_read[alignment_position].append(read_name)
         self.mismatch_count[alignment_position] += 1
+        self._update_insert_dictionary(alignment_position, read_sequence)
         yield alignment_position
 
-    def parse_reads(self, reads):
+    def _select_alleles(self, position):
+        """
+        Given a genomic position, naively find the top 2 represented sequences and return two lists of alleles
+        :param position: Position where to find the alleles
+        :return: top_2_alleles: the most frequent two alleles
+        """
+        # keep only the top n most frequent alleles
+        n = PLOIDY
+        snp_alleles = list()
+        in_alleles = list()
+
+        if position in self.snp_dictionary:
+            snp_alleles = self.snp_dictionary[position]
+            snp_alleles = sorted(snp_alleles.items(), key=operator.itemgetter(1))
+
+        if position in self.insert_dictionary:
+            in_alleles = self.insert_dictionary[position]
+            in_alleles = sorted(in_alleles.items(), key=operator.itemgetter(1))
+
+        if len(snp_alleles) > n:
+            snp_alleles = snp_alleles[:n]
+        if len(in_alleles) > n:
+            in_alleles = in_alleles[:n]
+
+        return snp_alleles, in_alleles
+
+    def parse_reads_and_select_candidates(self, reads):
         """
         Parse reads to aligned to a site to find variants
         :param reads: Set of reads aligned
@@ -179,6 +219,23 @@ class CandidateFinder:
             # check if the mapping quality of the read is above threshold
             if read.mapping_quality > DEFAULT_MIN_MAP_QUALITY:
                 self.candidate_positions.update(self.find_read_candidates(read=read))
+
+        selected_allele_list = []
+        for pos in self.candidate_positions:
+            n_inserts, n_snps = self._select_alleles(position=pos)
+            ref_base = self.reference_dictionary[pos]
+            selected_allele_list.append((pos, ref_base, n_snps, n_inserts))
+
+        return selected_allele_list
+
+    def _update_reference_dictionary(self, position, ref_base):
+        """
+        Update the reference dictionary
+        :param position: Genomic position
+        :param ref_base: Reference base at that position
+        :return:
+        """
+        self.reference_dictionary[position] = ref_base
 
     def find_read_candidates(self, read):
         """
@@ -195,6 +252,9 @@ class CandidateFinder:
         ref_sequence = self.fasta_handler.get_sequence(chromosome_name=self.chromosome_name,
                                                        start=ref_alignment_start,
                                                        stop=ref_alignment_stop)
+
+        for i, ref_base in enumerate(ref_sequence):
+            self._update_reference_dictionary(ref_alignment_start + i, ref_base)
 
         # read_index: index of read sequence
         # ref_index: index of reference sequence
@@ -223,7 +283,10 @@ class CandidateFinder:
 
             for pos in candidate_positions:
                 if self.region_start_position <= pos <= self.region_end_position:
-                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD:
+                    percent_mismatch = int((self.mismatch_count[pos]*100) / self.coverage[pos])
+                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
+                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD and \
+                            self.coverage[pos] > MIN_COVERAGE_THRESHOLD:
                         yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
@@ -267,7 +330,7 @@ class CandidateFinder:
             # alignment position is where the next alignment starts, for insert and delete this
             # position should be the anchor point hence we use a -1 to refer to the anchor point
             candidate_positions.update(self.parse_insert(alignment_position=alignment_position-1,
-                                                         length=length,
+                                                         read_sequence=read_sequence,
                                                          read_name=read_name))
             ref_index_increment = 0
         elif cigar_code == 2 or cigar_code == 3:
