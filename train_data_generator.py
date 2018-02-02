@@ -358,6 +358,6 @@ if __name__ == '__main__':
         view.test()
     elif FLAGS.chromosome_name is not None:
         chromosome_level_parallelization(FLAGS.chromosome_name, FLAGS.bam, FLAGS.ref,
-                                         FLAGS.vcf, FLAGS.output_dir, FLAGS.max_threads)
+                                         FLAGS.vcf, FLAGS.output_dir, FLAGS.max_threads,FLAGS.edit_threshold)
     else:
         genome_level_parallelization(FLAGS.bam, FLAGS.ref, FLAGS.vcf, FLAGS.output_dir, FLAGS.max_threads)
