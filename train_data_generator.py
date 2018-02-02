@@ -15,13 +15,15 @@ from modules.TextColor import TextColor
 from modules.FileManager import FileManager
 """
 alleleSelector finds possible variant sites in given bam file.
+This script is responsible of creating candidate sites with true genotypes for neural network training.
 
 It requires three parameters:
 - bam_file_path: path to a bam file
 - reference_file_path: path to a reference file
+- vcf_file_path: path to a VCF file for true genotype labeling
 
 Creates:
-- CandidateFinder object that contains windows of possible variants.
+- Bed files containing candidate sites and their true genotypes for training.
 
 
 Also, the terms "window" and "region" are NOT interchangeable.
@@ -29,9 +31,6 @@ Region: A genomic region of interest where we want to find possible variant cand
 Window: A window in genomic region where there can be multiple alleles
 
 A region can have multiple windows and each window belongs to a region.
-
- Example Usage:
- python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --output_dir [path_to_output] 
 """
 
 DEBUG_PRINT_CANDIDATES = False
