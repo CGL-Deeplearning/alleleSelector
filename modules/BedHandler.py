@@ -15,10 +15,12 @@ class BedHandler:
         :param bam_file_path: full path to a bam file
         """
         self.bed_file_path = bed_file_path
-        try:
-            self.bed_file = BedTool(self.bed_file_path)
-        except:
-            raise IOError("BED FILE READ ERROR")
+
+        if bed_file_path is not None:
+            try:
+                self.bed_file = BedTool(self.bed_file_path)
+            except:
+                raise IOError("BED FILE READ ERROR")
 
     @staticmethod
     def list_to_bed(list_bed_format):
@@ -32,10 +34,21 @@ class BedHandler:
 
     def intersect(self, bed_object):
         """
-        Intersect with another BedHandler instance
+        Intersect with another BedHandler instance, return BedHandler wrapper for new BED
+        :return: BedHandler object for intersected BED
+        """
+        out_bed_object = BedHandler(None)
+        out_bed_object.bed_file = self.bed_file.intersect(bed_object.bed_file)
+
+        return out_bed_object
+
+    def save(self, output_file_path):
+        """
+        Write the BEDTools object to hard drive
+        :param output_file_path:
         :return:
         """
-        return self.bed_file.intersect(bed_object.bed_file)
+        self.bed_file.saveas(output_file_path)
 
     def __getitem__(self, index):
         return self.bed_file[index]
