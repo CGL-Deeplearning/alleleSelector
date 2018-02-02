@@ -93,9 +93,11 @@ class CandidateLabeler:
         :return: genotype
         """
         # candidate attributes
-        pos_start, pos_stop, ref, alt = candidate_allele
+        pos_start, pos_stop, ref, alt_tuple = candidate_allele
+        alt, freq = alt_tuple
         # by default the genotype is Hom
         gt = HOM
+
         for i in range(pos_start, pos_stop+1):
             if i in positional_vcf.keys():
                 # get all records of that position
@@ -120,7 +122,7 @@ class CandidateLabeler:
         :param start: Allele start position
         :param stop: Allele stop position
         :param ref_seq: Reference sequence
-        :param alleles: Alleles
+        :param alleles_snp: SNP Alleles
         :param alleles_insert: Insert Alleles
         :return: Dictionary of genotypes
         """
@@ -208,7 +210,7 @@ class CandidateLabeler:
         for candidate_site in candidate_sites:
             allele_start = candidate_site[START]
             # we are doing one column candidates
-            allele_stop = candidate_site[START] + 1
+            allele_stop = candidate_site[START]
             ref_sequence = candidate_site[REF_INDEX]
             alleles_insert = candidate_site[IN_ALLELES]
             alleles_snp = candidate_site[SNP_ALLELES]
