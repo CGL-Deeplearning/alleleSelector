@@ -28,7 +28,7 @@ DEBUG_PRINT_ALL = False
 
 # Candidate data indexes
 START = 0
-STOP = 1
+REF_INDEX = 1
 IN_ALLELES = 2
 SNP_ALLELES = 3
 
@@ -183,10 +183,13 @@ class CandidateLabeler:
         :param genotypes: Genotypes
         :return: A list containing (chr start stop ref_seq alt1 alt2 gt1 gt2)
         """
-        all_candidates= []
-        for i, allele in enumerate(alleles_snp):
+        all_candidates = []
+        for i, allele_tuple in enumerate(alleles_snp):
+            allele, freq = allele_tuple
             all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[SNP][i]])
-        for i, allele in enumerate(alleles_in):
+
+        for i, allele_tuple in enumerate(alleles_in):
+            allele, freq = allele_tuple
             all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[IN][i]])
 
         return all_candidates
@@ -198,22 +201,17 @@ class CandidateLabeler:
         :param candidate_sites: Candidates
         :return: List of labeled candidate sites
         """
-        # create a log of whether variant positions have been matched to a candidate
-        validated_vcf_positions = {key: 0 for key in positional_vcf.keys()}
-
         # list of all labeled candidates
         all_labeled_candidates = []
 
         # for each candidate
         for candidate_site in candidate_sites:
             allele_start = candidate_site[START]
-            allele_stop = candidate_site[STOP]
+            # we are doing one column candidates
+            allele_stop = candidate_site[START] + 1
+            ref_sequence = candidate_site[REF_INDEX]
             alleles_insert = candidate_site[IN_ALLELES]
             alleles_snp = candidate_site[SNP_ALLELES]
-
-            ref_sequence = self.fasta_handler.get_sequence(chromosome_name=chromosome_name,
-                                                           start=allele_start,
-                                                           stop=allele_stop + 1)
 
             # test the alleles across IN, DEL, and SNP variant dictionaries
             genotypes = self._get_all_genotype_labels(positional_vcf=positional_vcf,

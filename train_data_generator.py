@@ -8,7 +8,6 @@ import multiprocessing
 from modules.CandidateFinder import CandidateFinder
 from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
-from modules.AlleleFinder import AlleleFinder
 from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
 from modules.BedHandler import BedHandler
@@ -35,34 +34,8 @@ A region can have multiple windows and each window belongs to a region.
  python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --output_dir [path_to_output] 
 """
 
-DEBUG_PRINT_WINDOWS = False
 DEBUG_PRINT_CANDIDATES = False
 DEBUG_TIME_PROFILE = False
-
-
-class AllCandidatesInRegion:
-    """
-    Creates a list of candidates in a region.
-    """
-    def __init__(self, chromosome_name, start_position, end_position):
-        """
-        Initialize object
-        :param chromosome_name: Name of the chromosome
-        :param start_position: Region start
-        :param end_position: Region end
-        """
-        self.chromosome_name = chromosome_name
-        self.start_position = start_position
-        self.end_position = end_position
-        self.all_candidates = []
-
-    def add_candidate_to_list(self, alignment_candidates_tuple):
-        """
-        Add a candidate to the list
-        :param alignment_candidates_tuple: Candidate tuple to add
-        :return:
-        """
-        self.all_candidates.append(alignment_candidates_tuple)
 
 
 class View:
@@ -90,44 +63,40 @@ class View:
         bedTools_object.saveas(self.output_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
                                '_' + str(end) + ".bed")
 
-    def get_labeled_candidate_sites(self, AllCandidatesInRegion_object, filter_hom_ref=False):
+    def get_labeled_candidate_sites(self, selected_candidate_list, start_pos, end_pos, filter_hom_ref=False):
         """
         Takes a dictionary of allele data and compares with a VCF to determine which candidate alleles are supported.
-        :param AllCandidatesInRegion_object: AllCandidatesInRegion object containing dictionary of all candidates
+        :param selected_candidate_list: List of all selected candidates with their alleles
         :param filter_hom_ref: whether to ignore hom_ref VCF records during candidate validation
+        :param start_pos: start position of the region
+        :param end_pos: end position of the region
         :return: labeled_sites: the parsed candidate list with the following structure for each entry:
 
         [chromosome_name, start, stop, is_insert, ref_seq, alt1, alt2, gt1, gt2]
         """
-        candidate_sites = AllCandidatesInRegion_object.all_candidates
-
-        # find start and stop position of region that covers all candidates
-
-        chromosome_name = AllCandidatesInRegion_object.chromosome_name
-        start = AllCandidatesInRegion_object.start_position
-        stop = AllCandidatesInRegion_object.end_position
-
         # get dictionary of variant records for full region
-        self.vcf_handler.populate_dictionary(contig=chromosome_name,
-                                             start_pos=start,
-                                             end_pos=stop,
+        self.vcf_handler.populate_dictionary(contig=self.chromosome_name,
+                                             start_pos=start_pos,
+                                             end_pos=end_pos,
                                              hom_filter=filter_hom_ref)
 
         # get separate positional variant dictionaries for IN, DEL, and SNP
         positional_variants = self.vcf_handler.get_variant_dictionary()
 
-        allele_selector = CandidateLabeler(fasta_handler=self.fasta_handler)
+        allele_labler = CandidateLabeler(fasta_handler=self.fasta_handler)
 
-        labeled_sites = allele_selector.get_labeled_candidates(chromosome_name=chromosome_name,
-                                                               positional_vcf=positional_variants,
-                                                               candidate_sites=candidate_sites)
+        labeled_sites = allele_labler.get_labeled_candidates(chromosome_name=self.chromosome_name,
+                                                             positional_vcf=positional_variants,
+                                                             candidate_sites=selected_candidate_list)
 
         return labeled_sites
 
     def parse_region(self, start_position, end_position):
         """
-        Find possible candidate windows.
-        - All candidate lists
+        Iterate through all the reads that fall in a region, find candidates, label candidates and output a bed file.
+        :param start_position: Start position of the region
+        :param end_position: End position of the region
+        :return:
         """
         reads = self.bam_handler.get_reads(chromosome_name=self.chromosome_name,
                                            start=start_position,
@@ -138,49 +107,30 @@ class View:
                                            chromosome_name=self.chromosome_name,
                                            region_start_position=start_position,
                                            region_end_position=end_position)
-        # parse reads to find candidate positions
-        candidate_finder.parse_reads(reads=reads)
-        # merge candidate positions
-        candidate_finder.merge_positions()
-        # print the windows we got
-        if DEBUG_PRINT_WINDOWS:
-            candidate_finder.print_windows()
 
-        candidate_windows = candidate_finder.get_candidate_windows()
-        all_candidate_lists = AllCandidatesInRegion(self.chromosome_name, start_position, end_position)
+        # go through each read and find candidate positions and alleles
+        selected_candidates = candidate_finder.parse_reads_and_select_candidates(reads=reads)
 
-        # for each window find list of possible alleles
-        for chr_name, window_start, window_end in candidate_windows:
-            # get the reference sequence
-            reference_sequence = self.fasta_handler.get_sequence(chr_name, window_start, window_end+1)
-            # get all pileup columns in that window
-            pileup_columns = self.bam_handler.get_pileupcolumns_aligned_to_a_region(chr_name, window_start, window_end+1)
+        if DEBUG_PRINT_CANDIDATES:
+            for candidate in selected_candidates:
+                print(candidate)
 
-            allele_finder = AlleleFinder(chr_name, window_start, window_end, pileup_columns, reference_sequence)
-            # generate base dictionaries
-            allele_finder.generate_base_dictionaries()
-            # generate candidate allele list
-            in_alleles, snp_alleles = allele_finder.generate_candidate_allele_list()
-
-            if DEBUG_PRINT_CANDIDATES:
-                print(chr_name, window_start, window_end, "INs: ", in_alleles, "SNPs: ", snp_alleles)
-
-            # add alleles to candidate
-            all_candidate_lists.add_candidate_to_list((window_start, window_end, in_alleles, snp_alleles))
-
-        labeled_sites = self.get_labeled_candidate_sites(all_candidate_lists, True)
+        labeled_sites = self.get_labeled_candidate_sites(selected_candidates, start_position, end_position, True)
 
         bed_file = BedHandler.list_to_bed(labeled_sites)
         self.write_bed(start_position, end_position, bed_file)
-
-        print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
 
     def test(self):
         """
         Run a test
         :return:
         """
-        self.parse_region(start_position=121400000, end_position=121600000)
+        start_time = time.time()
+        # self.parse_region(start_position=121400000, end_position=121600000)
+
+        self.parse_region(start_position=100000, end_position=200000)
+        end_time = time.time()
+        print("TOTAL TIME ELAPSED: ", end_time-start_time)
 
 
 def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position):
@@ -233,16 +183,13 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length + 10, whole_length)
         args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
-        # sys.stderr.write("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
-        print("STARTING PROCESS: " + str(start_position) + " " + str(end_position) + "\n")
+
         p = multiprocessing.Process(target=parallel_run, args=args)
         p.start()
 
         while True:
             if len(multiprocessing.active_children()) < max_threads:
                 break
-        # sys.stderr.write("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
-        # print("FINISHED PROCESSING: " + str(start_position) + "-" + str(end_position) + "\n")
 
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
