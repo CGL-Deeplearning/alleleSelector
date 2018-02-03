@@ -21,7 +21,7 @@
             None      None    NA
 
 """
-PLOIDY = 2
+PLOIDY = 10
 
 # DEBUG_FREQUENCIES = False
 DEBUG_PRINT_ALL = False
@@ -179,8 +179,8 @@ class CandidateLabeler:
         :param chromosome_name: Name of chromosome
         :param start: Allele start position
         :param stop: Allele end position
-        :param alleles: All alleles
-        :param alleles_insert: Insert alleles
+        :param alleles_snp: All non-insert alleles
+        :param alleles_in: Insert alleles
         :param ref_seq: reference Sequence
         :param genotypes: Genotypes
         :return: A list containing (chr start stop ref_seq alt1 alt2 gt1 gt2)
