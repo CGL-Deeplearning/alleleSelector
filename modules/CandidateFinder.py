@@ -196,11 +196,11 @@ class CandidateFinder:
 
         if position in self.snp_dictionary:
             snp_alleles = self.snp_dictionary[position]
-            snp_alleles = sorted(snp_alleles.items(), key=operator.itemgetter(1))
+            snp_alleles = sorted(snp_alleles.items(), key=operator.itemgetter(1), reverse=True)
 
         if position in self.insert_dictionary:
             in_alleles = self.insert_dictionary[position]
-            in_alleles = sorted(in_alleles.items(), key=operator.itemgetter(1))
+            in_alleles = sorted(in_alleles.items(), key=operator.itemgetter(1), reverse=True)
 
         if len(snp_alleles) > n:
             snp_alleles = snp_alleles[:n]
