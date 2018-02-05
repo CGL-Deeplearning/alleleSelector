@@ -170,6 +170,9 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     :param max_threads: Maximum number of threads
     :return: A list of results returned by the processes
     """
+
+    program_start_time = time.time()
+
     # entire length of chromosome
     fasta_handler = FastaHandler(ref_file)
     whole_length = fasta_handler.get_chr_sequence_length(chr_name)
@@ -192,6 +195,11 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         while True:
             if len(multiprocessing.active_children()) < max_threads:
                 break
+
+    program_end_time = time.time()
+    sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCCESSFULLY" + "\n")
+    sys.stderr.write(TextColor.CYAN + "TOTAL TIME FOR GENERATING ALL RESULTS: " + str(program_end_time-program_start_time) + "\n")
+
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
     """

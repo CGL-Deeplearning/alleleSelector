@@ -89,7 +89,7 @@ class View:
 
         self.print_region_info()
 
-        stats = [self.chromosome_name, self.bed_start, self.bed_stop] + [None, None, None, [None]]
+        stats = [0, 0, 0, []]
         # if there are records contained in the intersected BED
         if self.length > 0:
 
@@ -135,9 +135,6 @@ class View:
         return chromosome_name, start, stop
 
     def print_empty_region(self):
-        self.output_file.write("BED region:                %s %d %d\n" % (self.chromosome_name, self.bed_start, self.bed_stop))
-        self.output_file.write("Items before intersection: %d\n" % len(self.bed_handler_allele))
-        self.output_file.write("Items after intersection:  %d\n" % self.length)
         self.output_file.write("False Negative: None\n")
         self.output_file.write("False Positive: None\n")
         self.output_file.write("True Positive:  None\n")
@@ -427,7 +424,7 @@ if __name__ == '__main__':
 
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.test:
+    if FLAGS.test == True:
         chromosome_level_iteration(vcf_file_path=FLAGS.vcf,
                                    confident_bed_file_path=FLAGS.confident_bed,
                                    allele_bed_directory_path=FLAGS.allele_dir,
