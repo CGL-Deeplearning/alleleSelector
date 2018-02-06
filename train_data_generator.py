@@ -109,7 +109,6 @@ class View:
 
         # go through each read and find candidate positions and alleles
         selected_candidates = candidate_finder.parse_reads_and_select_candidates(reads=reads)
-
         if DEBUG_PRINT_CANDIDATES:
             for candidate in selected_candidates:
                 print(candidate)
@@ -127,7 +126,7 @@ class View:
         start_time = time.time()
         # self.parse_region(start_position=121400000, end_position=121600000)
 
-        self.parse_region(start_position=100000, end_position=200000)
+        self.parse_region(start_position=5454815, end_position=5454820)
         end_time = time.time()
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 

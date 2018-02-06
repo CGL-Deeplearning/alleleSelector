@@ -30,7 +30,7 @@ A region can have multiple windows and each window belongs to a region.
  python3 main.py --bam [path_to_bam] --ref [path_to_reference_fasta_file] --chromosome_name chr3 --max_threads [max_number_of_threads] --test [True/False] --json [True/False] --output_dir [path_to_JSON_output] 
 """
 DEBUG_PRINT_WINDOWS = False
-DEBUG_PRINT_CANDIDATES = False
+DEBUG_PRINT_CANDIDATES = True
 
 
 class ComplexEncoder(json.JSONEncoder):
@@ -156,7 +156,7 @@ class View:
         :param json_out:
         :return:
         """
-        self.parse_region(start_position=100000, end_position=200000, json_out=json_out)
+        self.parse_region(start_position=5454815, end_position=5454816, json_out=json_out)
 
 
 def do_parallel(chr_name, bam_file, ref_file, json_out, output_dir, max_threads=5):

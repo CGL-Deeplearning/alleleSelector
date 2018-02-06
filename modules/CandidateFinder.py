@@ -220,6 +220,16 @@ class CandidateFinder:
             if read.mapping_quality > DEFAULT_MIN_MAP_QUALITY:
                 self.candidate_positions.update(self.find_read_candidates(read=read))
 
+        filtered_candidate_positions = list()
+        for pos in self.candidate_positions:
+            if self.region_start_position <= pos <= self.region_end_position:
+                percent_mismatch = int((self.mismatch_count[pos] * 100) / self.coverage[pos])
+                if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
+                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD:
+                    filtered_candidate_positions.append(pos)
+
+        self.candidate_positions = filtered_candidate_positions
+
         selected_allele_list = []
         for pos in self.candidate_positions:
             n_inserts, n_snps = self._select_alleles(position=pos)
@@ -283,10 +293,6 @@ class CandidateFinder:
 
             for pos in candidate_positions:
                 if self.region_start_position <= pos <= self.region_end_position:
-                    percent_mismatch = int((self.mismatch_count[pos]*100) / self.coverage[pos])
-                    if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
-                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD and \
-                            self.coverage[pos] > MIN_COVERAGE_THRESHOLD:
                         yield pos
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
