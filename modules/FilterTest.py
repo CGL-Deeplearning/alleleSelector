@@ -99,11 +99,11 @@ class View:
 
         variants = self.vcf_handler.read_positional_vcf_from_bed(self.output_confident_vcf_bed_path)
 
-        print(self.output_confident_vcf_bed_path)
-        for key in variants:
-            print(key,variants[key])
+        # print(self.output_confident_vcf_bed_path)
+        # for key in variants:
+        #     print(key,variants[key])
 
-        remove(self.output_vcf_bed_path)
+        # remove(self.output_vcf_bed_path)
         # remove(self.output_confident_vcf_bed_path)
 
         return variants
