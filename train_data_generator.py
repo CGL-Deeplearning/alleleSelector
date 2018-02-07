@@ -243,7 +243,8 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
 
     for chr in chr_list:
         # here we dumped all the bed files
-        path_to_dir = output_dir
+        path_to_dir = output_dir + chr + "/"
+        print(path_to_dir)
         concatenated_file_name = output_dir + chr + "_labeled.bed"
         filemanager_object = FileManager()
         # get all bed file paths from the directory
