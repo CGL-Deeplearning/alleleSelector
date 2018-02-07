@@ -106,6 +106,12 @@ class View:
         remove(self.output_vcf_bed_path)
         remove(self.output_confident_vcf_bed_path)
 
+        del self.bed_handler_allele
+        del self.bed_handler_confident
+        del self.bed_handler_confident_alleles
+        del self.bed_handler_confident_vcf
+        del self.bed_handler_vcf
+
         return variants
 
     def parse_region(self):
