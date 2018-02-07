@@ -219,7 +219,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
     #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    chr_list = ["chr20", "chr21", "chr22"]
+    chr_list = ["chr21", "chr22"]
 
     # each chormosome in list
     for chr in chr_list:
@@ -243,7 +243,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
 
     for chr in chr_list:
         # here we dumped all the bed files
-        path_to_dir = output_dir + chr + "/"
+        path_to_dir = output_dir_path + chr + "/"
         print(path_to_dir)
         concatenated_file_name = output_dir + chr + "_labeled.bed"
         filemanager_object = FileManager()
