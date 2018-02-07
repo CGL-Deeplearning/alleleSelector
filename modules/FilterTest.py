@@ -103,8 +103,8 @@ class View:
         # for key in variants:
         #     print(key,variants[key])
 
-        # remove(self.output_vcf_bed_path)
-        # remove(self.output_confident_vcf_bed_path)
+        remove(self.output_vcf_bed_path)
+        remove(self.output_confident_vcf_bed_path)
 
         return variants
 
@@ -296,12 +296,12 @@ def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, all
     for proc in jobs:
         proc.join()
 
-    write_results_dictionary_to_file(output_dir_path=output_dir_path,results=return_dict)
+    write_results_dictionary_to_file(output_dir_path=output_dir_path, results=return_dict)
 
 
 def write_results_dictionary_to_file(output_dir_path, results):
     output_filename = join(output_dir_path, "chromosome_output.txt")
-    output_file = open(output_filename,'w')
+    output_file = open(output_filename, 'w')
 
     for key in sorted(results.keys()):
 
