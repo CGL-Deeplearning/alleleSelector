@@ -180,7 +180,7 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length, whole_length)
-
+        print("Current chunk: ", i+1, "/", len(chunks))
         args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
 
         p = multiprocessing.Process(target=parallel_run, args=args)
