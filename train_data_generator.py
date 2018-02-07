@@ -150,7 +150,7 @@ def parallel_run(chr_name, bam_file, ref_file, output_dir, vcf_file, start_posit
                    reference_file_path=ref_file,
                    output_file_path=output_dir,
                    vcf_file_path=vcf_file)
-    print(chr_name, output_dir)
+
     # return the results
     view_ob.parse_region(start_position, end_position)
 
@@ -205,7 +205,7 @@ def create_output_dir_for_chromosome(output_dir, chr_name):
     return path_to_dir
 
 
-def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_threads):
+def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, max_threads):
     """
     This method calls chromosome_level_parallelization for each chromosome.
     :param bam_file: BAM file path
@@ -227,9 +227,8 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir, max_t
         start_time = time.time()
 
         # create dump directory inside output directory
-        output_dir = create_output_dir_for_chromosome(output_dir, chr)
+        output_dir = create_output_dir_for_chromosome(output_dir_path, chr)
 
-        print(output_dir)
         # do a chromosome level parallelization
         chromosome_level_parallelization(chr, bam_file, ref_file, vcf_file, output_dir, max_threads)
 
