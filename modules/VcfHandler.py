@@ -1,5 +1,6 @@
 import pysam
 import sys
+import csv
 
 """
 This script defines classes to handle a VCF file.
@@ -108,6 +109,53 @@ class VCFFileProcessor:
                 ret_str += str(rec) + "\n"
 
         return ret_str
+
+    def save_positional_vcf_as_bed(self, chromosome_name, output_path_name):
+        # class_code = ["SNP","IN"]
+        # gt_code = ["HOM","HET","HOM_ALT"]
+
+        with open(output_path_name, 'w') as file:
+            writer = csv.writer(file, delimiter='\t')
+
+            for pos in sorted(self.genotype_dictionary):
+                # print(self.genotype_dictionary[pos])
+                for variant_class in [SNP,IN]:      # Assuming that SNP and DEL have een merged into a single class
+                    for variant in self.genotype_dictionary[pos][variant_class]:
+                        ref, alt, gt = variant
+                        row = [chromosome_name, pos, pos+1, ref, alt, gt, variant_class]
+                        # print(row)
+                        writer.writerow(row)
+
+    @staticmethod
+    def read_positional_vcf_from_bed(bed_path_name):
+        # class_code = {"SNP":0,"IN":1}
+        # gt_code = {"HOM":0,"HET":1,"HOM_ALT":2}
+
+        positional_vcf = dict()
+
+        with open(bed_path_name, 'r') as file:
+            csv_object = csv.reader(file, delimiter='\t')
+
+            for entry in csv_object:
+                # print(entry)
+
+                chromosome_name = entry[0]
+                start = int(entry[1])
+                stop = int(entry[2])
+                ref = entry[3]
+                alt = entry[4]
+                genotype = int(entry[5])
+                variant_class = int(entry[6])
+                record = (ref, alt, genotype)
+
+                # print(start, record)
+
+                if start not in positional_vcf:
+                    positional_vcf[int(start)] = [[],[],[]]
+
+                positional_vcf[start][int(variant_class)].append(record)
+
+        return positional_vcf
 
     @staticmethod
     def get_genotype_class(rec, ref, alt):

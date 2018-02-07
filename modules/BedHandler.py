@@ -32,13 +32,13 @@ class BedHandler:
         bedtool_obj = BedTool(list_bed_format)
         return bedtool_obj
 
-    def intersect(self, bed_object):
+    def intersect(self, bed_object, u=False):
         """
         Intersect with another BedHandler instance, return BedHandler wrapper for new BED
         :return: BedHandler object for intersected BED
         """
         out_bed_object = BedHandler(None)
-        out_bed_object.bed_file = self.bed_file.intersect(bed_object.bed_file)
+        out_bed_object.bed_file = self.bed_file.intersect(bed_object.bed_file,u=True)
 
         return out_bed_object
 

@@ -5,6 +5,7 @@ from timeit import default_timer as timer
 import argparse
 import multiprocessing
 import os.path
+from os import remove
 from os.path import join
 import csv
 import sys
@@ -40,12 +41,16 @@ class View:
         self.bed_handler_confident = BedHandler(confident_bed_file_path)
         self.bed_handler_allele = BedHandler(allele_bed_file_path)
         self.bed_handler_confident_alleles = None
+        self.bed_handler_confident_vcf = None
         self.tester = FilterTest()
 
+        # print(self.allele_bed_file_path)
         self.chromosome_name, self.bed_start, self.bed_stop = self.get_region_from_file_path()
 
         self.output_filename = self.chromosome_name + "_" + str(self.bed_start) + "_" + str(self.bed_stop) + ".txt"
         self.output_bed_filename = "confident_" + self.output_filename[:-4] + ".bed"
+        self.output_vcf_filename = "vcf_" + self.output_filename[:-4] + ".bed"
+        self.output_confident_vcf_filename = "confident_vcf_" + self.output_filename[:-4] + ".bed"
 
         self.output_directory_path = output_directory_path
         if not os.path.exists(output_directory_path):
@@ -53,6 +58,8 @@ class View:
 
         self.output_path = join(self.output_directory_path, self.output_filename)
         self.output_bed_path = join(self.output_directory_path, self.output_bed_filename)
+        self.output_vcf_bed_path = join(self.output_directory_path, self.output_vcf_filename)
+        self.output_confident_vcf_bed_path = join(self.output_directory_path, self.output_confident_vcf_filename)
 
         self.confident_alleles_file = None
         self.output_file = None
@@ -65,31 +72,54 @@ class View:
         :param deallocate:
         :return:
         """
+
         self.bed_handler_confident_alleles = self.bed_handler_allele.intersect(self.bed_handler_confident)
         self.bed_handler_confident_alleles.save(self.output_bed_path)
 
         self.length = len(self.bed_handler_confident_alleles)
         self.unintersected_length = len(self.bed_handler_allele)
 
-        if deallocate:
-            del self.bed_handler_allele
-            del self.bed_handler_confident
+        # if deallocate:
+        #     del self.bed_handler_allele
+        #     del self.bed_handler_confident
+
+    def intersect_vcf_with_confident_bed(self):
+        self.vcf_handler.save_positional_vcf_as_bed(chromosome_name=self.chromosome_name,
+                                                    output_path_name=self.output_vcf_bed_path)
+
+
+        self.bed_handler_vcf = BedHandler(self.output_vcf_bed_path)
+
+
+        self.bed_handler_confident_vcf = self.bed_handler_vcf.intersect(self.bed_handler_confident)
+
+
+        self.bed_handler_confident_vcf.save(self.output_confident_vcf_bed_path)
+
+
+        variants = self.vcf_handler.read_positional_vcf_from_bed(self.output_confident_vcf_bed_path)
+
+        print(self.output_confident_vcf_bed_path)
+        for key in variants:
+            print(key,variants[key])
+
+        remove(self.output_vcf_bed_path)
+        # remove(self.output_confident_vcf_bed_path)
+
+        return variants
 
     def parse_region(self):
         """
-        Parse the input data from end to end, write the output stats to files
+        Parse the input data from end to end, return the output stats
         :return:
         """
         self.intersect_alleles_with_confident_bed()
-        self.output_file = open(self.output_path, 'w')
-        # self.confident_alleles_file = open(self.confident_bed_file_path, 'r')
 
         bed_file = open(self.output_bed_path, 'r')
         confident_alleles = csv.reader(bed_file, delimiter='\t')
 
-        self.print_region_info()
-
         stats = [0, 0, 0, []]
+
         # if there are records contained in the intersected BED
         if self.length > 0:
 
@@ -99,21 +129,10 @@ class View:
                                                  end_pos=self.bed_stop,
                                                  hom_filter=True)
 
-            # get separate positional variant dictionaries for IN, DEL, and SNP
-            positional_variants = self.vcf_handler.get_variant_dictionary()
-            # print(self.chromosome_name, self.bed_start, self.bed_stop, len(positional_variants))
+            positional_variants = self.intersect_vcf_with_confident_bed()
 
             stats = self.tester.validate_alleles(positional_variants, confident_alleles)
 
-            self.print_stats(n_false_negative=stats[FN],
-                             n_true_positive=stats[TP],
-                             n_false_positive=stats[FP])
-
-            self.print_unvalidated_positions(unvalidated_alleles=stats[UNVALIDATED_ALLELES])
-        else:
-            self.print_empty_region()
-
-        self.output_file.close()
         bed_file.close()
 
         print("COMPLETED: ", self.chromosome_name, self.bed_start, self.bed_stop)
@@ -127,32 +146,14 @@ class View:
         """
         # Label_chr1_97600000_97800000.bed
         filename = os.path.basename(self.allele_bed_file_path).split('.')[0]
+        # print(filename)
         filename_words = filename.split('_')
+        # print(filename_words)
         chromosome_name = filename_words[1]
         start = int(filename_words[2])
         stop = int(filename_words[3])
 
         return chromosome_name, start, stop
-
-    def print_empty_region(self):
-        self.output_file.write("False Negative: None\n")
-        self.output_file.write("False Positive: None\n")
-        self.output_file.write("True Positive:  None\n")
-
-    def print_unvalidated_positions(self, unvalidated_alleles):
-        for allele in unvalidated_alleles:
-            self.output_file.write("\nWARNING: Unsupported VCF position: %d\n" % allele[POS])
-            self.output_file.write("\tRecord: %s\n" % str(allele[VARIANT]))
-
-    def print_region_info(self):
-        self.output_file.write("BED region:                %s %d %d\n" % (self.chromosome_name, self.bed_start, self.bed_stop))
-        self.output_file.write("Items before intersection: %d\n" % self.unintersected_length)
-        self.output_file.write("Items after intersection:  %d\n" % self.length)
-
-    def print_stats(self, n_false_negative, n_false_positive, n_true_positive):
-        self.output_file.write("False Negative: %d\n" % n_false_negative)
-        self.output_file.write("False Positive: %d\n" % n_false_positive)
-        self.output_file.write("True Positive:  %d\n" % n_true_positive)
 
 
 class FilterTest:
@@ -193,7 +194,8 @@ class FilterTest:
 
         return n_true_positive, n_false_negative, n_false_positive, unvalidated_positions
 
-    def _is_supported(self, genotype):
+    @staticmethod
+    def _is_supported(genotype):
         """
         Test whether a candidate allele has a corresponding VCF variant. i.e.: is the allele labeled as het/hom_alt ?
         :param genotype: the label/genotype code for an allele
@@ -227,6 +229,20 @@ class FilterTest:
         return n_false_negative, unvalidated_positions
 
 
+def print_unvalidated_positions(output_file, unvalidated_alleles):
+    for allele in unvalidated_alleles:
+        output_file.write("\nWARNING: Unsupported VCF position: %d\n"%allele[POS])
+        output_file.write("\tRecord: %s\n"%str(allele[VARIANT]))
+    output_file.write("\n")
+
+
+def print_region_info(output_file, chromosome_name, bed_start, bed_stop, n_false_negative, n_false_positive, n_true_positive):
+    output_file.write("BED region:     %s %d %d\n"%(chromosome_name, bed_start, bed_stop))
+    output_file.write("False Negative: %d\n"%n_false_negative)
+    output_file.write("False Positive: %d\n"%n_false_positive)
+    output_file.write("True Positive:  %d\n"%n_true_positive)
+
+
 def parallel_run(vcf_file_path, confident_bed_file_path, allele_bed_file_path, output_dir_path, return_dict):
     """
     Run this method in parallel
@@ -243,54 +259,9 @@ def parallel_run(vcf_file_path, confident_bed_file_path, allele_bed_file_path, o
                 output_directory_path=output_dir_path)
 
     data = view.parse_region()
-    key = data[1]   # unique key identifying chromosome coordinate
+    key = data[1]               # unique key identifying chromosome coordinate
     return_dict[key] = data
 
-# def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, allele_bed_directory_path, max_threads, output_dir_path):
-#     """
-#     This method takes one chromosome name as parameter and chunks that chromosome in max_threads.
-#     :param vcf_file_path: Chromosome name
-#     :param confident_bed_file_path: Bam file path
-#     :param allele_bed_directory_path: Ref file path
-#     :return:
-#     """
-#     # entire set of files
-#     file_manager = FileManager()
-#     allele_bed_file_paths = file_manager.get_file_paths_from_directory(allele_bed_directory_path)
-#
-#     for file_path in allele_bed_file_paths:
-#         # parse window of the segment. Use a 1000 overlap for corner cases.
-#         args = (vcf_file_path, confident_bed_file_path, file_path, output_dir_path)
-#
-#         p = multiprocessing.Process(target=parallel_run, args=args)
-#         p.start()
-#
-#         while True:
-#             if len(multiprocessing.active_children()) < max_threads:
-#                 break
-
-def print_empty_region(output_file, chromosome_name, bed_start, bed_stop):
-    output_file.write("BED region:     %s %d %d\n"%(chromosome_name, bed_start, bed_stop))
-    output_file.write("False Negative: None\n")
-    output_file.write("False Positive: None\n")
-    output_file.write("True Positive:  None\n")
-
-
-def print_unvalidated_positions(output_file, unvalidated_alleles):
-    for allele in unvalidated_alleles:
-        output_file.write("\nWARNING: Unsupported VCF position: %d\n"%allele[POS])
-        output_file.write("\tRecord: %s\n"%str(allele[VARIANT]))
-    output_file.write("\n")
-
-
-def print_region_info(output_file, chromosome_name, bed_start, bed_stop):
-    output_file.write("BED region:     %s %d %d\n"%(chromosome_name, bed_start, bed_stop))
-
-
-def print_stats(output_file, n_false_negative, n_false_positive, n_true_positive):
-    output_file.write("False Negative: %d\n"%n_false_negative)
-    output_file.write("False Positive: %d\n"%n_false_positive)
-    output_file.write("True Positive:  %d\n"%n_true_positive)
 
 def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, allele_bed_directory_path,
                                      max_threads, output_dir_path):
@@ -310,26 +281,29 @@ def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, all
     allele_bed_file_paths = file_manager.get_file_paths_from_directory(allele_bed_directory_path)
 
     for file_path in allele_bed_file_paths:
-        # parse window of the segment. Use a 1000 overlap for corner cases.
-        args = (vcf_file_path, confident_bed_file_path, file_path, output_dir_path, return_dict)
+        if file_path.endswith(".bed"):
+            # parse window of the segment. Use a 1000 overlap for corner cases.
+            args = (vcf_file_path, confident_bed_file_path, file_path, output_dir_path, return_dict)
 
-        p = multiprocessing.Process(target=parallel_run, args=args)
-        jobs.append(p)
-        p.start()
+            p = multiprocessing.Process(target=parallel_run, args=args)
+            jobs.append(p)
+            p.start()
 
-        while True:
-            if len(multiprocessing.active_children()) < max_threads:
-                break
+            while True:
+                if len(multiprocessing.active_children()) < max_threads:
+                    break
 
     for proc in jobs:
         proc.join()
 
-    print(return_dict.keys())
+    write_results_dictionary_to_file(output_dir_path=output_dir_path,results=return_dict)
 
+
+def write_results_dictionary_to_file(output_dir_path, results):
     output_filename = join(output_dir_path, "chromosome_output.txt")
     output_file = open(output_filename,'w')
 
-    for key in sorted(return_dict.keys()):
+    for key in sorted(results.keys()):
 
         chromosome_name, \
         bed_start, \
@@ -337,43 +311,20 @@ def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, all
         n_true_positive, \
         n_false_negative, \
         n_false_positive, \
-        unvalidated_alleles = return_dict[key]
+        unvalidated_alleles = results[key]
 
         print_region_info(output_file=output_file,
                           chromosome_name=chromosome_name,
                           bed_start=bed_start,
-                          bed_stop=bed_stop)
-
-        print_stats(output_file=output_file,
-                    n_false_negative=n_false_negative,
-                    n_false_positive=n_false_positive,
-                    n_true_positive=n_true_positive)
+                          bed_stop=bed_stop,
+                          n_false_negative=n_false_negative,
+                          n_false_positive=n_false_positive,
+                          n_true_positive=n_true_positive)
 
         print_unvalidated_positions(output_file=output_file,
                                     unvalidated_alleles=unvalidated_alleles)
 
     output_file.close()
-
-
-def chromosome_level_iteration(vcf_file_path, confident_bed_file_path, allele_bed_directory_path, output_dir_path):
-    """
-    This method takes one chromosome name as parameter and chunks that chromosome in max_threads.
-    :param vcf_file_path: Chromosome name
-    :param confident_bed_file_path: Bam file path
-    :param allele_bed_directory_path: Ref file path
-    :return:
-    """
-    # entire set of files
-    file_manager = FileManager()
-    allele_bed_file_paths = file_manager.get_file_paths_from_directory(allele_bed_directory_path)
-
-    for file_path in allele_bed_file_paths:
-        # parse window of the segment. Use a 1000 overlap for corner cases.
-        view = View(vcf_file_path=vcf_file_path,
-                    confident_bed_file_path=confident_bed_file_path,
-                    allele_bed_file_path=file_path,
-                    output_directory_path=output_dir_path)
-        view.parse_region()
 
 
 if __name__ == '__main__':
@@ -424,16 +375,10 @@ if __name__ == '__main__':
 
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.test == True:
-        chromosome_level_iteration(vcf_file_path=FLAGS.vcf,
-                                   confident_bed_file_path=FLAGS.confident_bed,
-                                   allele_bed_directory_path=FLAGS.allele_dir,
-                                   output_dir_path=FLAGS.output_dir)
-    else:
-        chromosome_level_parallelization(vcf_file_path=FLAGS.vcf,
-                                         confident_bed_file_path=FLAGS.confident_bed,
-                                         allele_bed_directory_path=FLAGS.allele_dir,
-                                         max_threads=FLAGS.max_threads,
-                                         output_dir_path=FLAGS.output_dir)
+    chromosome_level_parallelization(vcf_file_path=FLAGS.vcf,
+                                     confident_bed_file_path=FLAGS.confident_bed,
+                                     allele_bed_directory_path=FLAGS.allele_dir,
+                                     max_threads=FLAGS.max_threads,
+                                     output_dir_path=FLAGS.output_dir)
 
 
