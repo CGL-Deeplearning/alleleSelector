@@ -245,7 +245,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
         # here we dumped all the bed files
         path_to_dir = output_dir_path + chr + "/"
         print(path_to_dir)
-        concatenated_file_name = output_dir + chr + "_labeled.bed"
+        concatenated_file_name = output_dir_path + chr + "_labeled.bed"
         filemanager_object = FileManager()
         # get all bed file paths from the directory
         file_paths = filemanager_object.get_file_paths_from_directory(path_to_dir)
