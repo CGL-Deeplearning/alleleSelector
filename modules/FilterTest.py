@@ -93,7 +93,6 @@ class View:
 
         remove(self.output_vcf_bed_path)
         remove(self.output_confident_vcf_bed_path)
-        remove(self.output_vcf_bed_path)
 
         del self.bed_handler_allele
         del self.bed_handler_confident
