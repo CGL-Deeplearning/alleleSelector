@@ -37,12 +37,13 @@ class View:
     def __init__(self, vcf_file_path, confident_bed_file_path, allele_bed_file_path, output_directory_path):
         self.confident_bed_file_path = confident_bed_file_path
         self.allele_bed_file_path = allele_bed_file_path
-        self.vcf_handler = VCFFileProcessor(vcf_file_path)
         self.bed_handler_confident = BedHandler(confident_bed_file_path)
         self.bed_handler_allele = BedHandler(allele_bed_file_path)
         self.bed_handler_confident_alleles = None
         self.bed_handler_confident_vcf = None
         self.bed_handler_vcf = None
+
+        self.vcf_handler = VCFFileProcessor(vcf_file_path)
         self.tester = FilterTest()
 
         # print(self.allele_bed_file_path)
@@ -228,7 +229,7 @@ def print_unvalidated_positions(output_file, unvalidated_alleles):
     for allele in unvalidated_alleles:
         output_file.write("\nWARNING: Unsupported VCF position: %d\n"%allele[POS])
         output_file.write("\tRecord: %s\n"%str(allele[VARIANT]))
-    output_file.write("\n")
+    # output_file.write("\n")
 
 
 def print_region_info(output_file, chromosome_name, bed_start, bed_stop, n_false_negative, n_false_positive, n_true_positive):
@@ -278,27 +279,19 @@ def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, all
     """
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
-    jobs = []
 
     # entire set of files
     file_manager = FileManager()
     allele_bed_file_paths = file_manager.get_file_paths_from_directory(allele_bed_directory_path)
+    args = list()
 
+    # generate exhaustive list of arguments to be sent to each thread
     for file_path in allele_bed_file_paths:
         if file_path.endswith(".bed"):
-            # parse window of the segment. Use a 1000 overlap for corner cases.
-            args = (vcf_file_path, confident_bed_file_path, file_path, output_dir_path, return_dict)
+            args.append((vcf_file_path, confident_bed_file_path, file_path, output_dir_path, return_dict))
 
-            p = multiprocessing.Process(target=parallel_run, args=args)
-            jobs.append(p)
-            p.start()
-
-            while True:
-                if len(multiprocessing.active_children()) < max_threads:
-                    break
-
-    for proc in jobs:
-        proc.join()
+    with Pool(processes=max_threads) as pool:
+        pool.starmap(parallel_run, args)
 
     write_results_dictionary_to_file(output_dir_path=output_dir_path, results=return_dict)
 
