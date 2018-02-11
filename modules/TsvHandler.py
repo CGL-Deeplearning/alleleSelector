@@ -1,4 +1,5 @@
 import csv
+from IntervalTree import IntervalTree
 from sys import path
 import time
 
@@ -19,6 +20,8 @@ class TsvHandler:
             stop = int(stop)
 
             intervals.append([start,stop])
+
+        tsv_file.close()
 
         return intervals
 
@@ -43,5 +46,9 @@ class TsvHandler:
         # for interval in intervals:
         #     print(interval)
 
+        tsv_file.close()
+
         return intervals
+
+    def get_int
 

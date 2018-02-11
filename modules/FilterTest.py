@@ -42,6 +42,7 @@ class View:
         self.bed_handler_allele = BedHandler(allele_bed_file_path)
         self.bed_handler_confident_alleles = None
         self.bed_handler_confident_vcf = None
+        self.bed_handler_vcf = None
         self.tester = FilterTest()
 
         # print(self.allele_bed_file_path)
@@ -79,10 +80,6 @@ class View:
         self.length = len(self.bed_handler_confident_alleles)
         self.unintersected_length = len(self.bed_handler_allele)
 
-        # if deallocate:
-        #     del self.bed_handler_allele
-        #     del self.bed_handler_confident
-
     def intersect_vcf_with_confident_bed(self):
         self.vcf_handler.save_positional_vcf_as_bed(chromosome_name=self.chromosome_name,
                                                     output_path_name=self.output_vcf_bed_path)
@@ -96,6 +93,7 @@ class View:
 
         remove(self.output_vcf_bed_path)
         remove(self.output_confident_vcf_bed_path)
+        remove(self.output_vcf_bed_path)
 
         del self.bed_handler_allele
         del self.bed_handler_confident
@@ -131,6 +129,7 @@ class View:
             stats = self.tester.validate_alleles(positional_variants, confident_alleles)
 
         bed_file.close()
+        remove(self.output_bed_path)
 
         print("COMPLETED: ", self.chromosome_name, self.bed_start, self.bed_stop)
 
