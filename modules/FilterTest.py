@@ -87,21 +87,12 @@ class View:
         self.vcf_handler.save_positional_vcf_as_bed(chromosome_name=self.chromosome_name,
                                                     output_path_name=self.output_vcf_bed_path)
 
-
         self.bed_handler_vcf = BedHandler(self.output_vcf_bed_path)
 
-
         self.bed_handler_confident_vcf = self.bed_handler_vcf.intersect(self.bed_handler_confident)
-
-
         self.bed_handler_confident_vcf.save(self.output_confident_vcf_bed_path)
 
-
         variants = self.vcf_handler.read_positional_vcf_from_bed(self.output_confident_vcf_bed_path)
-
-        # print(self.output_confident_vcf_bed_path)
-        # for key in variants:
-        #     print(key,variants[key])
 
         remove(self.output_vcf_bed_path)
         remove(self.output_confident_vcf_bed_path)
@@ -249,6 +240,15 @@ def print_region_info(output_file, chromosome_name, bed_start, bed_stop, n_false
     output_file.write("True Positive:  %d\n"%n_true_positive)
 
 
+def print_region_tsv_line(tsv_writer, chromosome_name, bed_start, bed_stop, n_false_negative, n_false_positive, n_true_positive):
+    tsv_writer.writerow([chromosome_name,
+                         bed_start,
+                         bed_stop,
+                         n_false_negative,
+                         n_false_positive,
+                         n_true_positive])
+
+
 def parallel_run(vcf_file_path, confident_bed_file_path, allele_bed_file_path, output_dir_path, return_dict):
     """
     Run this method in parallel
@@ -308,9 +308,15 @@ def chromosome_level_parallelization(vcf_file_path, confident_bed_file_path, all
 def write_results_dictionary_to_file(output_dir_path, results):
     output_filename = join(output_dir_path, "chromosome_output.txt")
     output_file = open(output_filename, 'w')
+    tsv_writer = csv.writer(output_file, delimiter='\t')
+
+    total_true_positive = 0
+    total_false_negative = 0
+    total_false_positive = 0
+
+    all_unvalidated_alleles = list()
 
     for key in sorted(results.keys()):
-
         chromosome_name, \
         bed_start, \
         bed_stop, \
@@ -319,16 +325,23 @@ def write_results_dictionary_to_file(output_dir_path, results):
         n_false_positive, \
         unvalidated_alleles = results[key]
 
-        print_region_info(output_file=output_file,
-                          chromosome_name=chromosome_name,
-                          bed_start=bed_start,
-                          bed_stop=bed_stop,
-                          n_false_negative=n_false_negative,
-                          n_false_positive=n_false_positive,
-                          n_true_positive=n_true_positive)
+        total_true_positive += n_true_positive
+        total_false_negative += n_false_negative
+        total_false_positive += n_false_positive
 
+        print_region_tsv_line(tsv_writer=tsv_writer,
+                              chromosome_name=chromosome_name,
+                              bed_start=bed_start,
+                              bed_stop=bed_stop,
+                              n_false_negative=n_false_negative,
+                              n_false_positive=n_false_positive,
+                              n_true_positive=n_true_positive)
+
+        all_unvalidated_alleles.append(unvalidated_alleles)
+
+    for allele_list in all_unvalidated_alleles:
         print_unvalidated_positions(output_file=output_file,
-                                    unvalidated_alleles=unvalidated_alleles)
+                                    unvalidated_alleles=allele_list)
 
     output_file.close()
 
