@@ -21,6 +21,7 @@ HOM = 0
 HET = 1
 HOM_ALT = 2
 
+VCF_QUALITY_THRESHOLD = 60
 
 class VCFRecord:
     """
@@ -40,21 +41,8 @@ class VCFRecord:
         # FILTER field of VCF file
         self.rec_filter = list(rec.filter)[0]
 
-        # Decides if record homozygous or not
-        # If true that record won't be recorded in the dictionary
-        self.rec_not_hom = True
-
-        # If VCF record has two recorded genotype like 0/1 or 1/0
-        if len(self.rec_genotype) == 2:
-            # If both are 0 or filter not PASS then rec_not_hom is false
-            self.rec_not_hom = not self.is_hom_ref(self.rec_genotype)
-
-        # # If VCF record has one recorded genotype like 1
-        # elif len(self.rec_genotype) == 1:
-        #     # This mostly means it's heterozygous
-        #     self.rec_not_hom = not (self.rec_genotype[0] == 0)
-
-        # print(self.rec_genotype,self.get_genotype_type(self.rec_genotype),self.rec_not_hom)
+        # Decides if record hom_ref or not
+        self.rec_not_hom = not self.is_hom_ref(self.rec_genotype)
 
         self.rec_chrom = rec.chrom
         self.rec_alleles = rec.alleles
@@ -118,7 +106,6 @@ class VCFFileProcessor:
         self.total_het = 0
         self.total_hom_alt = 0
         self.vcf_offset = -1
-        self.quality_threshold = 60
 
     def __str__(self):
         """
@@ -150,17 +137,12 @@ class VCFFileProcessor:
 
     @staticmethod
     def read_positional_vcf_from_bed(bed_path_name):
-        # class_code = {"SNP":0,"IN":1}
-        # gt_code = {"HOM":0,"HET":1,"HOM_ALT":2}
-
         positional_vcf = dict()
 
         with open(bed_path_name, 'r') as file:
             csv_object = csv.reader(file, delimiter='\t')
 
             for entry in csv_object:
-                # print(entry)
-
                 chromosome_name = entry[0]
                 start = int(entry[1])
                 stop = int(entry[2])
@@ -169,8 +151,6 @@ class VCFFileProcessor:
                 genotype = int(entry[5])
                 variant_class = int(entry[6])
                 record = (ref, alt, genotype)
-
-                # print(start, record)
 
                 if start not in positional_vcf:
                     positional_vcf[int(start)] = [[],[],[]]
@@ -343,7 +323,7 @@ class VCFFileProcessor:
             # If the record can be added to the dictionary add it to the list
             if vcf_record.rec_filter == 'PASS':
                 filtered_records.append(vcf_record)
-            elif vcf_record.rec_qual > self.quality_threshold:
+            elif vcf_record.rec_qual > VCF_QUALITY_THRESHOLD:
                 filtered_records.append(vcf_record)
 
             # print(vcf_record)
