@@ -1,7 +1,7 @@
 import csv
-from IntervalTree import IntervalTree
-from sys import path
-import time
+# from IntervalTree import IntervalTree
+# from sys import path
+# import time
 
 class TsvHandler:
     def __init__(self, tsv_file_path):
@@ -50,5 +50,5 @@ class TsvHandler:
 
         return intervals
 
-    def get_int
+    # def get_int
 

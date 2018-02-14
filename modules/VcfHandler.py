@@ -47,13 +47,14 @@ class VCFRecord:
         # If VCF record has two recorded genotype like 0/1 or 1/0
         if len(self.rec_genotype) == 2:
             # If both are 0 or filter not PASS then rec_not_hom is false
-            self.rec_not_hom = not ((self.rec_genotype[0] == self.rec_genotype[1]
-                                    and self.rec_genotype[0] == 0) or self.rec_filter != 'PASS')
+            self.rec_not_hom = not self.is_hom_ref(self.rec_genotype)
 
-        # If VCF record has one recorded genotype like 1
-        elif len(self.rec_genotype) == 1:
-            # This mostly means it's heterozygous
-            self.rec_not_hom = not (self.rec_genotype[0] == 0)
+        # # If VCF record has one recorded genotype like 1
+        # elif len(self.rec_genotype) == 1:
+        #     # This mostly means it's heterozygous
+        #     self.rec_not_hom = not (self.rec_genotype[0] == 0)
+
+        # print(self.rec_genotype,self.get_genotype_type(self.rec_genotype),self.rec_not_hom)
 
         self.rec_chrom = rec.chrom
         self.rec_alleles = rec.alleles
@@ -69,6 +70,26 @@ class VCFRecord:
         """
         gts = [s['GT'] for s in record.samples.values()]
         return gts[0]
+
+    @staticmethod
+    def is_hom_ref(genotype):
+        """
+        Get type of a genotype (0/0, 0/1 or 1/0)
+        :param genotype: Type of GT
+        :return:
+        """
+        is_hom = True
+        gt_set = set(genotype)
+
+        if len(gt_set) > 1:
+            is_hom = False
+        elif len(gt_set) == 1:
+            if (0 not in gt_set) and (None not in gt_set):
+                is_hom = False
+        else:
+            raise ValueError("INVALID GENOTYPE ENCOUNTERED" + genotype)
+
+        return is_hom
 
     def __str__(self):
         """
@@ -97,6 +118,7 @@ class VCFFileProcessor:
         self.total_het = 0
         self.total_hom_alt = 0
         self.vcf_offset = -1
+        self.quality_threshold = 60
 
     def __str__(self):
         """
@@ -317,9 +339,15 @@ class VCFFileProcessor:
             # Filter homozygous records if hom_filter is true
             if hom_filter is True and vcf_record.rec_not_hom is False:
                 continue
+
             # If the record can be added to the dictionary add it to the list
             if vcf_record.rec_filter == 'PASS':
                 filtered_records.append(vcf_record)
+            elif vcf_record.rec_qual > self.quality_threshold:
+                filtered_records.append(vcf_record)
+
+            # print(vcf_record)
+
         # Return the list
         return filtered_records
 

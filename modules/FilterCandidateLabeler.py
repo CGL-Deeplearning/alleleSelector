@@ -251,17 +251,20 @@ class CandidateLabeler:
         :param candidate_sites: Candidates
         :return: List of labeled candidate sites
         """
+
         # list of all labeled candidates
         all_labeled_frequencies = list()
 
         interval_tree = IntervalTree(confident_intervals)
 
         # for each candidate
-        for c,candidate_site in enumerate(candidate_sites):
+        for c,candidate_site in enumerate(sorted(candidate_sites)):
             allele_start = candidate_site[START]
             allele_stop = candidate_site[START]
 
             interval = [allele_start, allele_start]
+
+            # print(allele_start, candidate_site[REF_INDEX], candidate_site[SNP_ALLELES], candidate_site[IN_ALLELES])
 
             if interval in interval_tree:
                 ref_sequence = candidate_site[REF_INDEX]
