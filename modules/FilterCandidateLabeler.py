@@ -291,12 +291,6 @@ class CandidateLabeler:
 
                 # print(allele_start,allele_stop,genotypes,support,coverage_depth)
                 # print(numpy.array2string(vector, separator="\t", precision=2, max_line_width=400))
-                # print()
-                # print('\t'.join(labeled_alleles[DATA]))
-                # print('\t'.join(map(str, labeled_frequencies[DATA])) + "\t\t" + str(labeled_frequencies[LABEL]))
-
-                # all_labeled_frequencies.append(labeled_frequencies)
-                # all_labeled_alleles.append(labeled_alleles)
 
                 if DEBUG_PRINT_ALL:
                     print()
@@ -306,7 +300,8 @@ class CandidateLabeler:
                     print("insert gts:     ", genotypes[IN])
                     print("snp gts:        ", genotypes[SNP])
 
-        # numpy.set_printoptions(threshold=numpy.nan)
-        # print(self.all_labeled_frequencies)
+        # if there is no data for this region, append an empty vector
+        if len(all_labeled_frequencies) == 0:
+            all_labeled_frequencies.append(numpy.array(list()))
 
         return numpy.concatenate(all_labeled_frequencies)
