@@ -116,7 +116,7 @@ class CandidateLabeler:
                     # get the alt allele of the record
                     rec_alt = record[ALT]
 
-                    print(candidate_allele, rec_alt, record[GT])
+                    # print(candidate_allele, rec_alt, record[GT])
 
                     # if the alt allele of the record is same as candidate allele
                     if rec_alt == alt:
@@ -289,8 +289,8 @@ class CandidateLabeler:
 
                 all_labeled_frequencies.append(vector)
 
-                print(allele_start,allele_stop,genotypes,support,coverage_depth)
-                print(numpy.array2string(vector, separator="\t", precision=2, max_line_width=400))
+                # print(allele_start,allele_stop,genotypes,support,coverage_depth)
+                # print(numpy.array2string(vector, separator="\t", precision=2, max_line_width=400))
                 # print()
                 # print('\t'.join(labeled_alleles[DATA]))
                 # print('\t'.join(map(str, labeled_frequencies[DATA])) + "\t\t" + str(labeled_frequencies[LABEL]))
