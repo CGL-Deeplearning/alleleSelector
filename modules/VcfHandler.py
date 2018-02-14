@@ -1,5 +1,6 @@
 import pysam
 import sys
+import csv
 
 """
 This script defines classes to handle a VCF file.
@@ -20,6 +21,7 @@ HOM = 0
 HET = 1
 HOM_ALT = 2
 
+VCF_QUALITY_THRESHOLD = 60
 
 class VCFRecord:
     """
@@ -39,20 +41,8 @@ class VCFRecord:
         # FILTER field of VCF file
         self.rec_filter = list(rec.filter)[0]
 
-        # Decides if record homozygous or not
-        # If true that record won't be recorded in the dictionary
-        self.rec_not_hom = True
-
-        # If VCF record has two recorded genotype like 0/1 or 1/0
-        if len(self.rec_genotype) == 2:
-            # If both are 0 or filter not PASS then rec_not_hom is false
-            self.rec_not_hom = not ((self.rec_genotype[0] == self.rec_genotype[1]
-                                    and self.rec_genotype[0] == 0) or self.rec_filter != 'PASS')
-
-        # If VCF record has one recorded genotype like 1
-        elif len(self.rec_genotype) == 1:
-            # This mostly means it's heterozygous
-            self.rec_not_hom = not (self.rec_genotype[0] == 0)
+        # Decides if record hom_ref or not
+        self.rec_not_hom = not self.is_hom_ref(self.rec_genotype)
 
         self.rec_chrom = rec.chrom
         self.rec_alleles = rec.alleles
@@ -68,6 +58,26 @@ class VCFRecord:
         """
         gts = [s['GT'] for s in record.samples.values()]
         return gts[0]
+
+    @staticmethod
+    def is_hom_ref(genotype):
+        """
+        Get type of a genotype (0/0, 0/1 or 1/0)
+        :param genotype: Type of GT
+        :return:
+        """
+        is_hom = True
+        gt_set = set(genotype)
+
+        if len(gt_set) > 1:
+            is_hom = False
+        elif len(gt_set) == 1:
+            if (0 not in gt_set) and (None not in gt_set):
+                is_hom = False
+        else:
+            raise ValueError("INVALID GENOTYPE ENCOUNTERED" + genotype)
+
+        return is_hom
 
     def __str__(self):
         """
@@ -108,6 +118,53 @@ class VCFFileProcessor:
                 ret_str += str(rec) + "\n"
 
         return ret_str
+
+    def save_positional_vcf_as_bed(self, chromosome_name, output_path_name):
+        # class_code = ["SNP","IN"]
+        # gt_code = ["HOM","HET","HOM_ALT"]
+
+        with open(output_path_name, 'w') as file:
+            writer = csv.writer(file, delimiter='\t')
+
+            for pos in sorted(self.genotype_dictionary):
+                # print(self.genotype_dictionary[pos])
+                for variant_class in [SNP,IN]:      # Assuming that SNP and DEL have een merged into a single class
+                    for variant in self.genotype_dictionary[pos][variant_class]:
+                        ref, alt, gt = variant
+                        row = [chromosome_name, pos, pos+1, ref, alt, gt, variant_class]
+                        # print(row)
+                        writer.writerow(row)
+
+    @staticmethod
+    def read_positional_vcf_from_bed(bed_path_name):
+        # class_code = {"SNP":0,"IN":1}
+        # gt_code = {"HOM":0,"HET":1,"HOM_ALT":2}
+
+        positional_vcf = dict()
+
+        with open(bed_path_name, 'r') as file:
+            csv_object = csv.reader(file, delimiter='\t')
+
+            for entry in csv_object:
+                # print(entry)
+
+                chromosome_name = entry[0]
+                start = int(entry[1])
+                stop = int(entry[2])
+                ref = entry[3]
+                alt = entry[4]
+                genotype = int(entry[5])
+                variant_class = int(entry[6])
+                record = (ref, alt, genotype)
+
+                # print(start, record)
+
+                if start not in positional_vcf:
+                    positional_vcf[int(start)] = [[],[],[]]
+
+                positional_vcf[start][int(variant_class)].append(record)
+
+        return positional_vcf
 
     @staticmethod
     def get_genotype_class(rec, ref, alt):
@@ -269,9 +326,15 @@ class VCFFileProcessor:
             # Filter homozygous records if hom_filter is true
             if hom_filter is True and vcf_record.rec_not_hom is False:
                 continue
+
             # If the record can be added to the dictionary add it to the list
             if vcf_record.rec_filter == 'PASS':
                 filtered_records.append(vcf_record)
+            elif vcf_record.rec_qual > VCF_QUALITY_THRESHOLD:
+                filtered_records.append(vcf_record)
+
+            # print(vcf_record)
+
         # Return the list
         return filtered_records
 
