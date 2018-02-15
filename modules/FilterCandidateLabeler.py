@@ -231,16 +231,16 @@ class CandidateLabeler:
         freq_length = len(freq_insert)+len(freq_snp)
 
         # initialize data vector for training with extra slots for coverage depth and training label
-        vector = numpy.zeros(freq_length+2)
+        vector = numpy.zeros((freq_length+2,1))
 
         # create composite vector of snps and inserts and normalize by coverage depth
         freq_vector = numpy.array(freq_snp + freq_insert)
         freq_vector = freq_vector/coverage_depth
 
         label = int(support)
-        vector[0:freq_length] = freq_vector
-        vector[-2] = float(coverage_depth)/1000
-        vector[-1] = label
+        vector[0:freq_length,0] = freq_vector
+        vector[-2,0] = float(coverage_depth)/1000
+        vector[-1,0] = label
 
         return vector
 
@@ -304,4 +304,4 @@ class CandidateLabeler:
         if len(all_labeled_frequencies) == 0:
             all_labeled_frequencies.append(numpy.array(list()))
 
-        return numpy.concatenate(all_labeled_frequencies)
+        return numpy.concatenate(all_labeled_frequencies,axis=1)

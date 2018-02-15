@@ -99,7 +99,8 @@ class View:
         positional_variants = self.vcf_handler.get_variant_dictionary()
 
         if DEBUG_SAVE_VCF:
-            self.vcf_handler.save_positional_vcf_as_bed(self.chromosome_name, os.path.join(self.output_dir,"vcf_bed_"+str(start_pos)+"_"+str(end_pos)))
+            vcf_filename = "vcf_bed_" + str(start_pos) + "_" + str(end_pos)
+            self.vcf_handler.save_positional_vcf_as_bed(self.chromosome_name, os.path.join(self.output_dir,vcf_filename))
 
         intervals = self.tsv_handler.get_subset_of_bed_intervals(start=start_pos,
                                                                  stop=end_pos,
@@ -112,6 +113,8 @@ class View:
                                                               positional_vcf=positional_variants,
                                                               candidate_sites=selected_candidate_list,
                                                               confident_intervals=intervals)
+        print(labeled_sites.shape)
+
         return labeled_sites
 
     def parse_region(self, start_position, end_position):
