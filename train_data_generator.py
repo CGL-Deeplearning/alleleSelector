@@ -180,7 +180,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
         # parse window of the segment. Use a 1000 overlap for corner cases.
         start_position = i * each_segment_length
         end_position = min((i + 1) * each_segment_length, whole_length)
-        print("Current chunk: ", i+1, "/", len(chunks))
         args = (chr_name, bam_file, ref_file, output_dir, vcf_file, start_position, end_position)
 
         p = multiprocessing.Process(target=parallel_run, args=args)
@@ -219,7 +218,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
     #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    chr_list = ["chr4"]
+    chr_list = ["chr3"]
 
     # each chormosome in list
     for chr in chr_list:
