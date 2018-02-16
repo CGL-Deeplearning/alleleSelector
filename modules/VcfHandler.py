@@ -21,7 +21,7 @@ HOM = 0
 HET = 1
 HOM_ALT = 2
 
-VCF_QUALITY_THRESHOLD = 60
+VCF_QUALITY_THRESHOLD = 10
 
 class VCFRecord:
     """
