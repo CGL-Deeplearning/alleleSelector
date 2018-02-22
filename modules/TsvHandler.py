@@ -1,7 +1,9 @@
 import csv
+from collections import defaultdict
 # from IntervalTree import IntervalTree
 # from sys import path
 # import time
+
 
 class TsvHandler:
     def __init__(self, tsv_file_path):
@@ -24,6 +26,24 @@ class TsvHandler:
         tsv_file.close()
 
         return intervals
+
+    def get_bed_intervals_by_chromosome(self):
+        tsv_file = open(self.tsv_file_path, 'r')
+        reader = csv.reader(tsv_file, delimiter='\t')
+
+        intervals_chromosomal = defaultdict(list)
+        for line in reader:
+            # print(line)
+            chromosome_name, start, stop = line[0:3]
+
+            start = int(start)
+            stop = int(stop)
+
+            intervals_chromosomal[chromosome_name].append([start,stop])
+
+        tsv_file.close()
+
+        return intervals_chromosomal
 
     def get_subset_of_bed_intervals(self, start, stop, start_offset=0, stop_offset=0, universal_offset=0):
         tsv_file = open(self.tsv_file_path, 'r')
@@ -49,6 +69,7 @@ class TsvHandler:
         tsv_file.close()
 
         return intervals
+
 
     # def get_int
 

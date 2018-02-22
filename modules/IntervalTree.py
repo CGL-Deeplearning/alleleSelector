@@ -46,6 +46,25 @@ class IntervalTree(object):
 
         return overlapping
 
+    def contains_interval_subset(self, interval):
+        """
+        Test if the query interval is fully within an interval in the interval tree
+        :param interval: query interval
+        :return: is_subset: boolean value corresponding to the test result
+        """
+        start_query, stop_query = interval
+        matches = self.find(start_query, stop_query)
+
+        is_subset = False
+        for match in matches:
+            start = match[0]
+            stop = match[1]
+
+            if (start <= start_query <= stop) and (start <= stop_query <= stop):
+                is_subset = True
+
+        return is_subset
+
     def __contains__(self, interval):
         start, stop = interval
         matches = self.find(start, stop)
@@ -54,4 +73,5 @@ class IntervalTree(object):
             return True
         else:
             return False
+
 
