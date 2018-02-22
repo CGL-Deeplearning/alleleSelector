@@ -126,7 +126,7 @@ class View:
         start_time = time.time()
         # self.parse_region(start_position=121400000, end_position=121600000)
 
-        self.parse_region(start_position=26824100, end_position=26824106)
+        self.parse_region(start_position=100000, end_position=200000)
         end_time = time.time()
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 

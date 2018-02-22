@@ -261,19 +261,19 @@ class VCFFileProcessor:
         :return:
         """
         if genotype_class == 'SNP':
-            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type))
+            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type), int(rec.rec_qual), rec.rec_filter)
             self._update_dictionary(rec.rec_pos + self.vcf_offset, position_based_vcf, SNP)
         elif genotype_class == 'DEL':
             list_of_records = self._handle_delete(rec.rec_pos, rec.rec_ref, alt, genotype_type)
             for record in list_of_records:
                 pos, ref_seq, alt_seq, genotype = record
-                position_based_vcf = (ref_seq, alt_seq, self._genotype_indexer(genotype))
+                position_based_vcf = (ref_seq, alt_seq, self._genotype_indexer(genotype), int(rec.rec_qual), rec.rec_filter)
                 self._update_dictionary(pos, position_based_vcf, DEL)
         elif genotype_class == 'IN':
             if len(rec.rec_ref) > 1:
                 rec.rec_ref, alt = self._trim_insert_sequences(rec.rec_ref, alt)
 
-            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type))
+            position_based_vcf = (rec.rec_ref, alt, self._genotype_indexer(genotype_type), int(rec.rec_qual), rec.rec_filter)
             self._update_dictionary(rec.rec_pos + self.vcf_offset, position_based_vcf, IN)
 
     def _trim_insert_sequences(self, ref_seq, alt_seq):
@@ -328,10 +328,10 @@ class VCFFileProcessor:
                 continue
 
             # If the record can be added to the dictionary add it to the list
-            if vcf_record.rec_filter == 'PASS':
-                filtered_records.append(vcf_record)
-            elif vcf_record.rec_qual > VCF_QUALITY_THRESHOLD:
-                filtered_records.append(vcf_record)
+            # if vcf_record.rec_filter == 'PASS':
+            #    filtered_records.append(vcf_record)
+
+            filtered_records.append(vcf_record)
 
             # print(vcf_record)
 

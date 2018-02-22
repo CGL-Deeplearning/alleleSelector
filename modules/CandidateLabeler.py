@@ -97,7 +97,8 @@ class CandidateLabeler:
         alt, freq = alt_tuple
         # by default the genotype is Hom
         gt = HOM
-
+        gt_q = 60
+        gt_f = "PASS"
         for i in range(pos_start, pos_stop+1):
             if i in positional_vcf.keys():
                 # get all records of that position
@@ -109,8 +110,11 @@ class CandidateLabeler:
                     if rec_alt == alt:
                         # then  we get the genotype
                         gt = record[GT]
+                        gt_q = record[3]
+                        gt_f = record[4]
 
-        return gt
+
+        return gt, gt_q, gt_f
 
     def _get_all_genotype_labels(self, positional_vcf, start, stop, ref_seq, alleles_snp, alleles_insert):
         """
@@ -130,12 +134,12 @@ class CandidateLabeler:
         gts_snp = list()
 
         for alt in alleles_insert:
-            gt_in = self.get_label_of_allele(positional_vcf, IN, (start, stop, ref_seq, alt))
-            gts_in.append(gt_in)
+            gt_in, gt_q, gt_f = self.get_label_of_allele(positional_vcf, IN, (start, stop, ref_seq, alt))
+            gts_in.append((gt_in, gt_q, gt_f))
 
         for alt in alleles_snp:
-            gt_snp = self.get_label_of_allele(positional_vcf, SNP, (start, stop, ref_seq, alt))
-            gts_snp.append(gt_snp)
+            gt_snp, gt_q, gt_f = self.get_label_of_allele(positional_vcf, SNP, (start, stop, ref_seq, alt))
+            gts_snp.append((gt_snp, gt_q, gt_f))
 
         return [gts_snp, gts_in]
 
@@ -188,11 +192,17 @@ class CandidateLabeler:
         all_candidates = []
         for i, allele_tuple in enumerate(alleles_snp):
             allele, freq = allele_tuple
-            all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[SNP][i]])
+            gt = genotypes[SNP][i][0]
+            gt_q = genotypes[SNP][i][1]
+            gt_f = genotypes[SNP][i][2]
+            all_candidates.append([chromosome_name, start, stop, ref_seq, allele, gt, gt_q, gt_f])
 
         for i, allele_tuple in enumerate(alleles_in):
             allele, freq = allele_tuple
-            all_candidates.append([chromosome_name, start, stop, ref_seq, allele, genotypes[IN][i]])
+            gt = genotypes[IN][i][0]
+            gt_q = genotypes[IN][i][1]
+            gt_f = genotypes[IN][i][2]
+            all_candidates.append([chromosome_name, start, stop, ref_seq, allele, gt, gt_q, gt_f])
 
         return all_candidates
 
