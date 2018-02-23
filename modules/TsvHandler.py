@@ -27,7 +27,7 @@ class TsvHandler:
 
         return intervals
 
-    def get_bed_intervals_by_chromosome(self):
+    def get_bed_intervals_by_chromosome(self, start_offset=0, stop_offset=0, universal_offset=0):
         tsv_file = open(self.tsv_file_path, 'r')
         reader = csv.reader(tsv_file, delimiter='\t')
 
@@ -36,8 +36,8 @@ class TsvHandler:
             # print(line)
             chromosome_name, start, stop = line[0:3]
 
-            start = int(start)
-            stop = int(stop)
+            start = int(start) + start_offset + universal_offset
+            stop = int(stop) + stop_offset + universal_offset
 
             intervals_chromosomal[chromosome_name].append([start,stop])
 

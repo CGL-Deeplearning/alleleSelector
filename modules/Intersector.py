@@ -13,7 +13,8 @@ def intersect(bed_file_path_query, bed_file_path_reference):
     :return:
     """
     tsv_handler_reference = TsvHandler(tsv_file_path=bed_file_path_reference)
-    intervals_chromosomal_reference = tsv_handler_reference.get_bed_intervals_by_chromosome()
+    intervals_chromosomal_reference = tsv_handler_reference.get_bed_intervals_by_chromosome(start_offset=1,
+                                                                                            universal_offset=-1)
 
     interval_trees_chromosomal = build_chromosomal_interval_trees(intervals_chromosomal=intervals_chromosomal_reference)
 
