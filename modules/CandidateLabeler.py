@@ -111,8 +111,16 @@ class CandidateLabeler:
                         # then  we get the genotype
                         gt = record[GT]
                         gt_q = record[3]
-                        gt_f = record[4]
 
+        for i in range(pos_start, pos_stop + 1):
+            if i in positional_vcf.keys():
+                # get all records of that position
+                records = positional_vcf[i]
+                for type_records in records:
+                    for record in type_records:
+                        if record[4] != 'PASS':
+                            gt_f = record[4]
+                            break
 
         return gt, gt_q, gt_f
 
