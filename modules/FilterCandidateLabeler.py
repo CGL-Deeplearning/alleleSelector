@@ -222,25 +222,61 @@ class CandidateLabeler:
 
             return frequencies
 
-    def _update_training_set(self, alleles_insert, alleles_snp, support, coverage_depth):
+    def _get_chromosome_number(self, chromosome_name):
+        number = int(chromosome_name.split("chr")[-1])
 
+        return number
+
+    def _get_separate_genotypes(self, genotypes):
+        gt_snp, gt_in = genotypes
+
+        if len(gt_snp) == 0:
+            gt_snp = 0
+        else:
+            gt_snp = gt_snp[0]
+
+        if len(gt_in) == 0:
+            gt_in = 0
+        else:
+            gt_in = gt_in[0]
+
+        return gt_snp, gt_in
+
+    def _build_training_vector(self, chromosome_number, start, gt_insert, gt_snp, alleles_insert, alleles_snp, support, coverage_depth):
         freq_insert = self._convert_to_fixed_length_vectors(alleles_insert)
         freq_snp = self._convert_to_fixed_length_vectors(alleles_snp)
 
         # combined length of frequency vectors
         freq_length = len(freq_insert)+len(freq_snp)
 
-        # initialize data vector for training with extra slots for coverage depth and training label
-        vector = numpy.zeros((freq_length+2,1))
+        # initialize data vector for training with extra slots for:
+        #   1 coverage depth
+        #   2 training label
+        #   3 het/hom/hom_alt for the SNPs/Deletes
+        #   4 het/hom/hom_alt for the Inserts
+        #   5 chromosome number
+        #   6 start position in chromosome
 
         # create composite vector of snps and inserts and normalize by coverage depth
         freq_vector = numpy.array(freq_snp + freq_insert)
         freq_vector = freq_vector/coverage_depth
 
+        # print(chromosome_number, start, gt_snp, gt_insert)
+
+        # for troubleshooting
+        metadata_vector = [chromosome_number, start, gt_snp, gt_insert]
+
+        # the training label
         label = int(support)
-        vector[0:freq_length,0] = freq_vector
+
+        # allocate numpy vector and assign data to it
+        vector = numpy.zeros((freq_length+6, 1))
+        vector[0:4,0] = metadata_vector
+        vector[4:4+freq_length,0] = freq_vector
         vector[-2,0] = float(coverage_depth)/1000
         vector[-1,0] = label
+
+        # print(vector)
 
         return vector
 
@@ -272,6 +308,8 @@ class CandidateLabeler:
                 alleles_snp = candidate_site[SNP_ALLELES]
                 coverage_depth = candidate_site[COVERAGE]
 
+                chromosome_number = self._get_chromosome_number(chromosome_name)
+
                 # test the alleles across IN, DEL, and SNP variant dictionaries
                 genotypes = self._get_all_genotype_labels(positional_vcf=positional_vcf,
                                                           start=allele_start,
@@ -280,12 +318,18 @@ class CandidateLabeler:
                                                           alleles_snp=alleles_snp,
                                                           alleles_insert=alleles_insert)
 
+                gt_snp, gt_insert = self._get_separate_genotypes(genotypes)
+
                 support = self._is_position_supported(genotypes)
 
-                vector = self._update_training_set(alleles_insert=alleles_insert,
-                                                   alleles_snp=alleles_snp,
-                                                   support=support,
-                                                   coverage_depth=coverage_depth)
+                vector = self._build_training_vector(chromosome_number=chromosome_number,
+                                                     start=allele_start,
+                                                     gt_snp=gt_snp,
+                                                     gt_insert=gt_insert,
+                                                     alleles_insert=alleles_insert,
+                                                     alleles_snp=alleles_snp,
+                                                     support=support,
+                                                     coverage_depth=coverage_depth)
 
                 all_labeled_frequencies.append(vector)
 

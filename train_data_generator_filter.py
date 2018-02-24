@@ -113,7 +113,7 @@ class View:
                                                               positional_vcf=positional_variants,
                                                               candidate_sites=selected_candidate_list,
                                                               confident_intervals=intervals)
-        print(labeled_sites.shape)
+        # print(labeled_sites.shape)
 
         return labeled_sites
 
