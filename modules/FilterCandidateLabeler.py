@@ -348,4 +348,12 @@ class CandidateLabeler:
         if len(all_labeled_frequencies) == 0:
             all_labeled_frequencies.append(numpy.array(list()))
 
-        return numpy.concatenate(all_labeled_frequencies,axis=1)
+        try:
+            numpy.concatenate(all_labeled_frequencies, axis=1)
+        except:
+            print("WARNING: Failed Concatenation: ", chromosome_name, positional_vcf.keys()[0], positional_vcf.keys()[-1])
+            print("length: ",len(all_labeled_frequencies))
+            if len(all_labeled_frequencies) > 0:
+                print(all_labeled_frequencies[0])
+
+        return
