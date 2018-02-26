@@ -350,7 +350,7 @@ class CandidateLabeler:
 
         try:
             numpy.concatenate(all_labeled_frequencies, axis=1)
-        except:
+        except(numpy.core._internal.AxisError):
             print("WARNING: Failed Concatenation: ", chromosome_name, positional_vcf.keys()[0], positional_vcf.keys()[-1])
             print("length: ",len(all_labeled_frequencies))
             if len(all_labeled_frequencies) > 0:

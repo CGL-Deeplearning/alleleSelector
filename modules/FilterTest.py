@@ -219,6 +219,7 @@ class FilterTest:
         for p,pos in enumerate(validated_vcf_positions):
             # print(p)
             if validated_vcf_positions[pos] == 0:
+                # check if record is PASS AND >60 Quality
                 n_false_negative += 1
                 unvalidated_positions.append([pos, variants[pos]])
 
