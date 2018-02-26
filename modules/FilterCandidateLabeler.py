@@ -346,14 +346,9 @@ class CandidateLabeler:
 
         # if there is no data for this region, append an empty vector
         if len(all_labeled_frequencies) == 0:
-            all_labeled_frequencies.append(numpy.array(list()))
+            all_labeled_frequencies = numpy.array([[]])
 
-        try:
+        else:
             numpy.concatenate(all_labeled_frequencies, axis=1)
-        except(numpy.core._internal.AxisError):
-            print("WARNING: Failed Concatenation: ", chromosome_name, positional_vcf.keys()[0], positional_vcf.keys()[-1])
-            print("length: ",len(all_labeled_frequencies))
-            if len(all_labeled_frequencies) > 0:
-                print(all_labeled_frequencies[0])
 
-        return
+        return all_labeled_frequencies
