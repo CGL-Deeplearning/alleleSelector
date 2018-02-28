@@ -20,8 +20,7 @@ MERGE_WINDOW_DISTANCE we merge them in a single window.
 DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
-MIN_MISMATCH_THRESHOLD = 2
-MIN_MISMATCH_PERCENT_THRESHOLD = 2
+MIN_MISMATCH_PERCENT_THRESHOLD = 4
 MIN_COVERAGE_THRESHOLD = 10
 PLOIDY = 2
 
@@ -224,7 +223,7 @@ class CandidateFinder:
         for pos in self.candidate_positions:
             if self.region_start_position <= pos <= self.region_end_position:
                 percent_mismatch = int((self.mismatch_count[pos] * 100) / self.coverage[pos])
-                if self.mismatch_count[pos] > MIN_MISMATCH_THRESHOLD and \
+                if self.coverage[pos] > MIN_COVERAGE_THRESHOLD and \
                         percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD:
                     filtered_candidate_positions.append(pos)
 
