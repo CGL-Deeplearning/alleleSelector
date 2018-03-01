@@ -133,8 +133,9 @@ class CandidateFinder:
                 self.mismatch_count[i] += 1
                 # increase the edit count
                 self.edit_count[i] += 1
-            else:
-                self._update_read_allele_dictionary(i, allele, MATCH_ALLELE)
+            # this slows things down a lot. Don't add reference allele to the dictionary if we don't use them
+            # else:
+                # self._update_read_allele_dictionary(i, allele, MATCH_ALLELE)
 
     def parse_delete(self, alignment_position, length, ref_sequence, read_name):
         """
@@ -369,7 +370,7 @@ class CandidateFinder:
             alt1, alt2 = alt2, alt1
         ref, alt1 = alt1, ref
         pos_end = pos + len(ref) - 1
-        return [self.chromosome_name, pos, pos_end, ref, alt1, alt2, 'DEL']
+        return [self.chromosome_name, pos, pos, ref, alt1, alt2, 'DEL']
 
     def parse_reads_and_select_candidates(self, reads):
         """

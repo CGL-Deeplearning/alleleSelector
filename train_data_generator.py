@@ -127,7 +127,7 @@ class View:
         start_time = time.time()
         # self.parse_region(start_position=121400000, end_position=121600000)
 
-        self.parse_region(start_position=16352636, end_position=16352640)
+        self.parse_region(start_position=100000, end_position=120000)
         end_time = time.time()
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 
@@ -254,7 +254,8 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
         filemanager_object.concatenate_files(file_paths, concatenated_file_name)
         # delete all temporary files
         filemanager_object.delete_files(file_paths)
-        filemanager_object.delete_files(path_to_dir)
+        # remove the directory
+        os.rmdir(path_to_dir)
 
     program_end_time = time.time()
     sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCCESSFULLY" + "\n")

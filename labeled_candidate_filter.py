@@ -13,10 +13,8 @@ def filter_bed(bed_file_path):
     reader = csv.reader(tsv_file, delimiter='\t')
 
     for line in reader:
-        rec_qual = int(line[6])
-        rec_filter = line[7]
-        in_confident = int(line[8])
-        if rec_qual >=60 and rec_filter == 'PASS' and in_confident == 1:
+        in_confident = int(line[7])
+        if in_confident == 1:
             print('\t'.join(line))
 
 
