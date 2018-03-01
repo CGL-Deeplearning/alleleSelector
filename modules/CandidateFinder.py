@@ -1,6 +1,6 @@
 from collections import defaultdict
 import operator
-
+import time
 """
 CandidateFinder finds possible positions based on edits we see in reads.
 It parses through each read of a site and finds possible candidate positions.
@@ -20,10 +20,14 @@ MERGE_WINDOW_DISTANCE we merge them in a single window.
 DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
+MIN_MISMATCH_THRESHOLD = 3
 MIN_MISMATCH_PERCENT_THRESHOLD = 4
 MIN_COVERAGE_THRESHOLD = 10
 PLOIDY = 2
-
+MATCH_ALLELE = 0
+MISMATCH_ALLELE = 1
+INSERT_ALLELE = 2
+DELETE_ALLELE = 3
 
 class CandidateFinder:
     """
@@ -54,7 +58,10 @@ class CandidateFinder:
 
         # the base and the insert dictionary for finding alleles
         self.snp_dictionary = {}
+        self.delete_dictionary = {}
         self.insert_dictionary = {}
+        self.positional_allele_dictionary = {}
+        self.read_allele_dictionary = {}
         self.reference_dictionary = {}
 
     def print_positions(self):
@@ -83,34 +90,23 @@ class CandidateFinder:
 
         return ref_alignment_stop
 
-    def _update_snp_dictionary(self, pos, allele):
-        """
-        Update the snp dictionary with allele frequency in a position
-        :param pos: Position
-        :param allele: Allele at that position
-        :return:
-        """
-        if pos not in self.snp_dictionary:
-            self.snp_dictionary[pos] = {}
-        if allele not in self.snp_dictionary[pos]:
-            self.snp_dictionary[pos][allele] = 0
+    def _update_read_allele_dictionary(self, pos, allele, type):
+        if pos not in self.read_allele_dictionary:
+            self.read_allele_dictionary[pos] = {}
+        if (allele, type) not in self.read_allele_dictionary[pos]:
+            self.read_allele_dictionary[pos][(allele, type)] = 0
 
-        self.snp_dictionary[pos][allele] += 1
+        self.read_allele_dictionary[pos][(allele, type)] += 1
 
-    def _update_insert_dictionary(self, pos, allele):
-        """
-        Update insert dictionary with allele frequency in a position
-        :param pos: Position
-        :param allele: Insert allele at that position
-        :return:
-        """
-        if pos not in self.insert_dictionary:
-            self.insert_dictionary[pos] = {}
+    def _update_positional_allele_dictionary(self, pos, allele, type):
+        if pos not in self.positional_allele_dictionary:
+            self.positional_allele_dictionary[pos] = {}
+        if type not in self.positional_allele_dictionary[pos]:
+            self.positional_allele_dictionary[pos][type] = {}
+        if allele not in self.positional_allele_dictionary[pos][type]:
+            self.positional_allele_dictionary[pos][type][allele] = 0
 
-        if allele not in self.insert_dictionary[pos]:
-            self.insert_dictionary[pos][allele] = 0
-
-        self.insert_dictionary[pos][allele] += 1
+        self.positional_allele_dictionary[pos][type][allele] += 1
 
     def parse_match(self, alignment_position, length, read_sequence, ref_sequence, read_name):
         """
@@ -128,20 +124,19 @@ class CandidateFinder:
         stop = start + length
         for i in range(start, stop):
             self.coverage[i] += 1
-            if read_sequence[i-alignment_position] != ref_sequence[i-alignment_position]:
-                # it's a true mismatch to the reference
-                # update the base dictionary
-                self._update_snp_dictionary(i, read_sequence[i-alignment_position])
+            allele = read_sequence[i-alignment_position]
+            ref = ref_sequence[i-alignment_position]
+
+            if allele != ref:
+                self._update_read_allele_dictionary(i, allele, MISMATCH_ALLELE)
                 # increase mismatch count
                 self.mismatch_count[i] += 1
                 # increase the edit count
                 self.edit_count[i] += 1
-                # update the candidates by read list
-                self.candidates_by_read[i].append(read_name)
-                # yield the position to be added to the candidate positions
-                yield i
+            else:
+                self._update_read_allele_dictionary(i, allele, MATCH_ALLELE)
 
-    def parse_delete(self, alignment_position, length, read_name):
+    def parse_delete(self, alignment_position, length, ref_sequence, read_name):
         """
         Process a cigar operation that is a delete
         :param alignment_position: Alignment position
@@ -151,20 +146,22 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
+        if alignment_position < self.region_start_position or alignment_position > self.region_end_position:
+            return
+
         # actual delete position starts one after the anchor
         start = alignment_position + 1
         stop = start + length
 
         for i in range(start, stop):
-            # update the base dictionary
-            self._update_snp_dictionary(i, "*")
-            # increase the mismatch count
-            self.mismatch_count[i] += 1
             # increase the coverage
             self.coverage[i] += 1
-            # append the read name to candidate read list
-            self.candidates_by_read[i].append(read_name)
-            yield i
+
+        # the allele is the anchor + what's being deleted
+        allele = self.reference_dictionary[alignment_position] + ref_sequence
+
+        # record the delete where it first starts
+        self._update_read_allele_dictionary(alignment_position + 1, allele, DELETE_ALLELE)
 
     def parse_insert(self, alignment_position, read_sequence, read_name):
         """
@@ -176,11 +173,15 @@ class CandidateFinder:
 
         This method updates the candidates dictionary. Mostly by adding read IDs to the specific positions.
         """
+
         self.edit_count[alignment_position] += 1
-        self.candidates_by_read[alignment_position].append(read_name)
         self.mismatch_count[alignment_position] += 1
-        self._update_insert_dictionary(alignment_position, self.reference_dictionary[alignment_position] + read_sequence)
-        yield alignment_position
+
+        # the allele is the anchor + what's being deleted
+        allele = self.reference_dictionary[alignment_position] + read_sequence
+        # print(alignment_position, allele)
+        # record the insert where it first starts
+        self._update_read_allele_dictionary(alignment_position + 1, allele, INSERT_ALLELE)
 
     def _select_alleles(self, position):
         """
@@ -208,35 +209,6 @@ class CandidateFinder:
 
         return snp_alleles, in_alleles
 
-    def parse_reads_and_select_candidates(self, reads):
-        """
-        Parse reads to aligned to a site to find variants
-        :param reads: Set of reads aligned
-        :return:
-        """
-        for read in reads:
-            # check if the mapping quality of the read is above threshold
-            if read.mapping_quality > DEFAULT_MIN_MAP_QUALITY:
-                self.candidate_positions.update(self.find_read_candidates(read=read))
-
-        filtered_candidate_positions = list()
-        for pos in self.candidate_positions:
-            if self.region_start_position <= pos <= self.region_end_position:
-                percent_mismatch = int((self.mismatch_count[pos] * 100) / self.coverage[pos])
-                if self.coverage[pos] > MIN_COVERAGE_THRESHOLD and \
-                        percent_mismatch > MIN_MISMATCH_PERCENT_THRESHOLD:
-                    filtered_candidate_positions.append(pos)
-
-        self.candidate_positions = filtered_candidate_positions
-
-        selected_allele_list = []
-        for pos in self.candidate_positions:
-            n_inserts, n_snps = self._select_alleles(position=pos)
-            ref_base = self.reference_dictionary[pos]
-            selected_allele_list.append((pos, ref_base, n_snps, n_inserts))
-
-        return selected_allele_list
-
     def _update_reference_dictionary(self, position, ref_base):
         """
         Update the reference dictionary
@@ -254,6 +226,7 @@ class CandidateFinder:
 
         Read candidates use a set data structure to find all positions in the read that has a possible variant.
         """
+        self.read_allele_dictionary = {}
         ref_alignment_start = read.reference_start
         ref_alignment_stop = self.get_read_stop_position(read)
         cigar_tuples = read.cigartuples
@@ -278,7 +251,7 @@ class CandidateFinder:
             read_sequence_segment = read_sequence[read_index:read_index+length]
 
             # send the cigar tuple to get attributes we got by this operation
-            ref_index_increment, read_index_increment, candidate_positions = \
+            ref_index_increment, read_index_increment = \
                 self.parse_cigar_tuple(cigar_code=cigar_code,
                                        length=length,
                                        alignment_position=ref_alignment_start+ref_index,
@@ -290,9 +263,23 @@ class CandidateFinder:
             read_index += read_index_increment
             ref_index += ref_index_increment
 
-            for pos in candidate_positions:
-                if self.region_start_position <= pos <= self.region_end_position:
-                        yield pos
+        # after collecting all alleles from reads, update the global dictionary
+        for position in self.read_allele_dictionary.keys():
+            if position < self.region_start_position or position > self.region_end_position:
+                continue
+            for record in self.read_allele_dictionary[position]:
+                # there can be only one record per position in a read
+                allele, allele_type = record
+                if allele_type == MATCH_ALLELE or allele_type == MISMATCH_ALLELE:
+                    # If next allele is indel then group it with the current one, don't make a separate one
+                    if position + 1 <= ref_alignment_stop and position + 1 in self.read_allele_dictionary.keys():
+                        next_allele, next_allele_type = list(self.read_allele_dictionary[position + 1].keys())[0]
+                        if next_allele_type == INSERT_ALLELE or next_allele_type == DELETE_ALLELE:
+                            continue
+                    self._update_positional_allele_dictionary(position, allele, allele_type)
+                else:
+                    # it's an insert or delete, so, add to the previous position
+                    self._update_positional_allele_dictionary(position-1, allele, allele_type)
 
     def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
         """
@@ -319,32 +306,30 @@ class CandidateFinder:
         ref_index_increment = length
         read_index_increment = length
 
-        # why is this here?
-        candidate_positions = set()
-
         # deal different kinds of operations
         if cigar_code == 0:
             # match
-            candidate_positions.update(self.parse_match(alignment_position=alignment_position,
-                                                        length=length,
-                                                        read_sequence=read_sequence,
-                                                        ref_sequence=ref_sequence,
-                                                        read_name=read_name))
+            self.parse_match(alignment_position=alignment_position,
+                             length=length,
+                             read_sequence=read_sequence,
+                             ref_sequence=ref_sequence,
+                             read_name=read_name)
         elif cigar_code == 1:
             # insert
             # alignment position is where the next alignment starts, for insert and delete this
             # position should be the anchor point hence we use a -1 to refer to the anchor point
-            candidate_positions.update(self.parse_insert(alignment_position=alignment_position-1,
-                                                         read_sequence=read_sequence,
-                                                         read_name=read_name))
+            self.parse_insert(alignment_position=alignment_position-1,
+                              read_sequence=read_sequence,
+                              read_name=read_name)
             ref_index_increment = 0
         elif cigar_code == 2 or cigar_code == 3:
             # delete or ref_skip
             # alignment position is where the next alignment starts, for insert and delete this
             # position should be the anchor point hence we use a -1 to refer to the anchor point
-            candidate_positions.update(self.parse_delete(alignment_position=alignment_position-1,
-                                                         length=length,
-                                                         read_name=read_name))
+            self.parse_delete(alignment_position=alignment_position-1,
+                              ref_sequence=ref_sequence,
+                              length=length,
+                              read_name=read_name)
             read_index_increment = 0
         elif cigar_code == 4:
             # soft clip
@@ -363,6 +348,66 @@ class CandidateFinder:
         else:
             raise("INVALID CIGAR CODE: %s" % cigar_code)
 
-        return ref_index_increment, read_index_increment, candidate_positions
+        return ref_index_increment, read_index_increment
 
+    def _filter_alleles(self, position, allele_frequency_list):
+        filtered_list = list()
+        for allele, count in allele_frequency_list:
+            frequency = self.coverage[position] * 100 / count
+            if count > MIN_MISMATCH_THRESHOLD and frequency > MIN_MISMATCH_PERCENT_THRESHOLD:
+                filtered_list.append(allele)
+        return filtered_list
 
+    def _get_substitution_record(self, pos, alt1, alt2, ref):
+        return [self.chromosome_name, pos, pos, ref, alt1, alt2, 'SUB']
+
+    def _get_insert_record(self, pos, alt1, alt2, ref):
+        return [self.chromosome_name, pos, pos, ref, alt1, alt2, 'IN']
+
+    def _get_delete_record(self, pos, alt1, alt2, ref):
+        if len(alt1) < len(alt2):
+            alt1, alt2 = alt2, alt1
+        ref, alt1 = alt1, ref
+        pos_end = pos + len(ref) - 1
+        return [self.chromosome_name, pos, pos_end, ref, alt1, alt2, 'DEL']
+
+    def parse_reads_and_select_candidates(self, reads):
+        """
+        Parse reads to aligned to a site to find variants
+        :param reads: Set of reads aligned
+        :return:
+        """
+        start_time = time.time()
+        total_reads = 0
+        for read in reads:
+            # check if the mapping quality of the read is above threshold
+            if read.mapping_quality > DEFAULT_MIN_MAP_QUALITY:
+                self.find_read_candidates(read=read)
+                total_reads += 1
+        # print('Read processing time', time.time()-start_time)
+
+        selected_allele_list = []
+        for pos in range(self.region_start_position, self.region_end_position):
+            if pos not in self.positional_allele_dictionary:
+                continue
+
+            ref = self.reference_dictionary[pos]
+            for type_of_record in self.positional_allele_dictionary[pos]:
+                if type_of_record == MATCH_ALLELE:
+                    continue
+                all_allele_dictionary = self.positional_allele_dictionary[pos][type_of_record]
+                # pick the top 2 most frequent allele
+                allele_frequency_list = list(sorted(all_allele_dictionary.items(), key=operator.itemgetter(1)))[:PLOIDY]
+                allele_list = self._filter_alleles(pos, allele_frequency_list)
+                alt1 = allele_list[0] if len(allele_list) >= 1 else None
+                alt2 = allele_list[1] if len(allele_list) >= 2 else '.'
+                if alt1 is None:
+                    continue
+                if type_of_record == MISMATCH_ALLELE:
+                    selected_allele_list.append(self._get_substitution_record(pos, alt1, alt2, ref))
+                elif type_of_record == INSERT_ALLELE:
+                    selected_allele_list.append(self._get_insert_record(pos, alt1, alt2, ref))
+                elif type_of_record == DELETE_ALLELE:
+                    selected_allele_list.append(self._get_delete_record(pos, alt1, alt2, ref))
+
+        return selected_allele_list

@@ -1,6 +1,7 @@
 import argparse
 import math
 import time
+import csv
 import os
 import sys
 import multiprocessing
@@ -10,7 +11,6 @@ from modules.BamHandler import BamHandler
 from modules.FastaHandler import FastaHandler
 from modules.VcfHandler import VCFFileProcessor
 from modules.CandidateLabeler import CandidateLabeler
-from modules.BedHandler import BedHandler
 from modules.TextColor import TextColor
 from modules.FileManager import FileManager
 """
@@ -51,7 +51,7 @@ class View:
         # --- initialize parameters ---
         self.chromosome_name = chromosome_name
 
-    def write_bed(self, start, end, bedTools_object):
+    def write_bed(self, start, end, candidate_list):
         """
         Create a bed output of all candidates found in the region
         :param start: Candidate region start
@@ -59,8 +59,11 @@ class View:
         :param bedTools_object: bedtools object that'll be converted to a bed file
         :return:
         """
-        bedTools_object.saveas(self.output_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) +
-                               '_' + str(end) + ".bed")
+        file_name = self.output_dir + "Label" + '_' + self.chromosome_name + '_' + str(start) + '_' + str(end) + ".bed"
+        with open(file_name, 'w', newline='\n') as tsvfile:
+            writer = csv.writer(tsvfile, delimiter='\t')
+            for record in candidate_list:
+                writer.writerow(record)
 
     def get_labeled_candidate_sites(self, selected_candidate_list, start_pos, end_pos, filter_hom_ref=False):
         """
@@ -112,11 +115,9 @@ class View:
         if DEBUG_PRINT_CANDIDATES:
             for candidate in selected_candidates:
                 print(candidate)
-
-        labeled_sites = self.get_labeled_candidate_sites(selected_candidates, start_position, end_position, True)
-
-        bed_file = BedHandler.list_to_bed(labeled_sites)
-        self.write_bed(start_position, end_position, bed_file)
+        # exit()
+        # labeled_sites = self.get_labeled_candidate_sites(selected_candidates, start_position, end_position, True)
+        self.write_bed(start_position, end_position, selected_candidates)
 
     def test(self):
         """
@@ -126,7 +127,7 @@ class View:
         start_time = time.time()
         # self.parse_region(start_position=121400000, end_position=121600000)
 
-        self.parse_region(start_position=129806620, end_position=129806630)
+        self.parse_region(start_position=16352636, end_position=16352640)
         end_time = time.time()
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 
@@ -244,7 +245,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
         # here we dumped all the bed files
         path_to_dir = output_dir_path + chr + "/"
 
-        concatenated_file_name = path_to_dir + chr + "_labeled.bed"
+        concatenated_file_name = output_dir_path + chr + "_labeled.bed"
 
         filemanager_object = FileManager()
         # get all bed file paths from the directory
@@ -253,6 +254,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
         filemanager_object.concatenate_files(file_paths, concatenated_file_name)
         # delete all temporary files
         filemanager_object.delete_files(file_paths)
+        filemanager_object.delete_files(path_to_dir)
 
     program_end_time = time.time()
     sys.stderr.write(TextColor.RED + "PROCESSED FINISHED SUCCESSFULLY" + "\n")
