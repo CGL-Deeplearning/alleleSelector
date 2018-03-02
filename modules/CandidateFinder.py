@@ -29,6 +29,7 @@ MISMATCH_ALLELE = 1
 INSERT_ALLELE = 2
 DELETE_ALLELE = 3
 
+
 class CandidateFinder:
     """
     Given reads that align to a site and a pointer to the reference fasta file handler,
