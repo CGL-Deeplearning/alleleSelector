@@ -26,7 +26,7 @@ def get_prediction_set_from_bed(candidate_bed):
     prediction_set = []
     rec_id = 1
     for record in bed_records:
-        chr_name, pos_start, pos_end, ref, alt1, alt2, rec_type = record.rstrip().split('\t')[0:6]
+        chr_name, pos_start, pos_end, ref, alt1, alt2, rec_type = record.rstrip().split('\t')[0:7]
         if alt2 != '.':
             prediction_set.extend(get_images_for_two_alts(rec_id, record))
         else:
