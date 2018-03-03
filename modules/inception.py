@@ -124,7 +124,7 @@ class Inception3(nn.Module):
             return x, aux
         print(x.size())
         if self.training is False:
-            m = nn.Softmax(dim=(1, self.num_classes))
+            m = nn.Softmax(dim=(1, 3))
             x = m(x)
         print(x.size())
         return x
