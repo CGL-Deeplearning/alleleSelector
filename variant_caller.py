@@ -69,7 +69,7 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
             print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j],
                   CLASS_BY_INDEX[preds_numpy[j]], pred_array[0], pred_array[1], pred_array[2])
         if i % 10 == 0:
-            sys.stderr.write(TextColor.BLUE + 'BATCHES DONE: ' + str(i) + '/' + len(predict_loader))
+            sys.stderr.write(TextColor.BLUE + 'BATCHES DONE: ' + str(i) + '/' + str(len(predict_loader)) + "\n")
 
 
 def call_variants(bam_file, ref_file, candidate_bed, model_path, gpu_mode, batch_size, output_dir):
