@@ -64,6 +64,8 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
 
         for j in range(0, images.size()[0]):
             pred_array = preds[j].data
+            preds_numpy = preds.cpu().data.topk(1)[1].numpy().ravel().tolist()
+            print(preds_numpy)
             print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j], pred_array[0], pred_array[1], pred_array[2])
 
         exit()
