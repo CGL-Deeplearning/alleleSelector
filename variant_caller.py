@@ -63,8 +63,8 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
         preds = model(images).cpu()
 
         for j in range(0, images.size()[0]):
-            pred_array = preds[j].data.numpy()
-            print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j], '\t'.join(pred_array))
+            pred_array = preds[j].data
+            print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j], pred_array[0], pred_array[1], pred_array[2])
 
         exit()
 
