@@ -11,6 +11,7 @@ from modules.deepore.dataloader_pred import DataSetLoader
 from modules.TextColor import TextColor
 from image_analyzer import *
 
+CLASS_BY_INDEX = ["HOM", "HET", "HOM_ALT"]
 
 def get_images_for_two_alts(rec_id, record):
     chr_name, pos_start, pos_end, ref, alt1, alt2, rec_type = record.rstrip().split('\t')[0:7]
@@ -61,13 +62,12 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
             images = images.cuda()
 
         preds = model(images).cpu()
+        preds_numpy = preds.cpu().data.topk(1)[1].numpy().ravel().tolist()
 
         for j in range(0, images.size()[0]):
             pred_array = preds[j].data
-            preds_numpy = preds.cpu().data.topk(1)[1].numpy().ravel().tolist()
-            print(preds_numpy)
-            print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j], pred_array[0], pred_array[1], pred_array[2])
-
+            print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j],
+                  CLASS_BY_INDEX[preds_numpy[j]], pred_array[0], pred_array[1], pred_array[2])
         exit()
 
 
