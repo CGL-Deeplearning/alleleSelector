@@ -122,7 +122,6 @@ class Inception3(nn.Module):
         # 1000 (num_classes)
         if self.training and self.aux_logits:
             return x, aux
-        print(x)
         if self.training is False:
             m = nn.Softmax(dim=1)
             x = m(x)

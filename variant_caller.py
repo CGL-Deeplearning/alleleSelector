@@ -60,9 +60,11 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
         if gpu_mode:
             images = images.cuda()
 
-        preds = model(images)
-        print(rec_ids[0], chr_names[0], pos_starts[0], pos_ends[0], refs[0], alt1s[0], alt2s[0], rec_types[0])
-        print(preds)
+        preds = model(images).cpu()
+
+        for j in range(0, images.size()[0]):
+            print(rec_ids[j], chr_names[j], pos_starts[j], pos_ends[j], refs[j], alt1s[j], alt2s[j], rec_types[j])
+            print(preds[j].numpy())
         exit()
 
 
