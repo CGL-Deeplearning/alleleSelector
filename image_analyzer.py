@@ -52,9 +52,9 @@ def get_match_ref_color(is_match):
     :return:
     """
     if is_match == 50:
-        return 1
-    elif is_match == 254:
         return 0
+    elif is_match == 254:
+        return 1
 
 
 def get_strand_color(is_rev):
@@ -155,7 +155,10 @@ def analyze_it(img):
 
 
 def analyze_np_array(img):
-    img = img.numpy() * 255
+    if isinstance(img, np.ndarray) is False:
+        img = img.numpy() * 255
+    else:
+        img = np.transpose(img, (2, 0, 1))
     # img = np.reshape(np_array_of_img, shape)
     # img = np.transpose(img, (0, 1, 2))
     print("BASE CHANNEL")

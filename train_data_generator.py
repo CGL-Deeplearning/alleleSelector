@@ -12,7 +12,7 @@ from modules.genomePileup.vcf_handler import VCFFileProcessor
 from modules.genomePileup.ref_handler import RefFileProcessor
 from modules.genomePileup.bam_handler_mpileup import BamProcessor
 from modules.genomePileup.pileup_creator import PileupProcessor
-from modules.FileManager import FileManager
+from modules.genomePileup.FileManager import FileManager
 
 TEST_CHR = "chr3"
 TEST_REGION = "100000-200000"
@@ -166,7 +166,7 @@ def test(contig, site, bam_file, ref_file, vcf_file, output_dir):
             if rec.type == 'Hom' and select_or_not(downsample_rate) is False:
                 continue
             elif rec.type == 'Hom':
-                rec.alt = alt
+                rec.alt = rec.ref
 
             total_generated_hom += 1 if rec.type == 'Hom' else 0
             total_generated_het += 1 if rec.type == 'Het' else 0
@@ -218,7 +218,7 @@ def get_records_given_contig(contig, vcf_file):
     :return:
     """
     # create the vcf handler
-    vcf_handler = modules.vcf_handler.VCFFileProcessor(vcf_file)
+    vcf_handler = VCFFileProcessor(vcf_file)
     # generate dictionary of the region
     vcf_handler.populate_dictionary(contig, hom_filter=False)
 
@@ -272,8 +272,8 @@ def generate_pileup(contig, bam_file, ref_file, records, output_dir, thread_name
     :return:
     """
     # create ref and bam files handler
-    ref_handler = modules.ref_handler.RefFileProcessor(ref_file)
-    bam_handler = modules.bam_handler_mpileup.BamProcessor(bam_file)
+    ref_handler = RefFileProcessor(ref_file)
+    bam_handler = BamProcessor(bam_file)
 
     # create a summary file
     smry = open(output_dir + "summary/" + "summary" + '_' + contig + "_" + thread_name + ".csv", 'w')
@@ -283,13 +283,12 @@ def generate_pileup(contig, bam_file, ref_file, records, output_dir, thread_name
         pos = rec.pos
         alt = '.'
         if rec.type == 'Hom':
-            rec.alt = alt
+            rec.alt = rec.ref
 
         # get pileup columns from bam file
         pileup_columns = bam_handler.get_pileupcolumns_aligned_to_a_site(contig, pos-1)
         # create the pileup processor object
-        pileup_object = modules.pileup_creator.PileupProcessor(ref_handler, pileup_columns, contig, pos-1,
-                                                               rec.type, rec.alt)
+        pileup_object = PileupProcessor(ref_handler, pileup_columns, contig, pos-1, rec.type, rec.alt)
 
         # create the image
         image_array, array_shape = pileup_object.create_image(pos-1, image_height=300, image_width=300, ref_band=5,
@@ -323,7 +322,6 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     sys.stderr.write(TextColor.BLUE + "STARTING TO GENERATE IMAGES\n" + TextColor.END)
 
     chunk_size = int(math.ceil(total_records/max_threads)) + 2
-    chunk_size = 100
 
     for i in range(max_threads):
         st = time.time()
@@ -375,7 +373,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
     #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    chr_list = ["chr3"]
+    chr_list = ["chr19"]
 
     # each chormosome in list
     for chr in chr_list:
@@ -445,7 +443,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="output/",
+        default="image_output/",
         help="Name of output directory"
     )
     parser.add_argument(
