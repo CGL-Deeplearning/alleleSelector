@@ -121,7 +121,7 @@ class Inception3(nn.Module):
         if self.training and self.aux_logits:
             return x, aux
         if self.training is False:
-            x = nn.Softmax(x)
+            x = nn.LogSoftmax(x)
         return x
 
 
