@@ -277,7 +277,6 @@ def generate_pileup(contig, bam_file, ref_file, records, output_dir, thread_name
 
     # create a summary file
     smry = open(output_dir + "summary/" + "summary" + '_' + contig + "_" + thread_name + ".csv", 'w')
-    counter = 0
     st_time = time.time()
     for rec in records:
         pos = rec.pos
@@ -302,8 +301,6 @@ def generate_pileup(contig, bam_file, ref_file, records, output_dir, thread_name
         label = get_label(rec.type)
         smry.write(os.path.abspath(output_dir + file_name) + ".png," + str(label) + ',' + ','.join(
             map(str, array_shape)) + ',' + str(rec.genotype_class) + '\n')
-        print('Counter: ', counter, time.time()-st_time)
-        counter += 1
 
 
 def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, output_dir, max_threads):
@@ -320,25 +317,20 @@ def chromosome_level_parallelization(chr_name, bam_file, ref_file, vcf_file, out
     sys.stderr.write(TextColor.BLUE + "PROCESSING VCF FILE\n" + TextColor.END)
     all_records, total_records = get_records_given_contig(chr_name, vcf_file)
     sys.stderr.write(TextColor.BLUE + "STARTING TO GENERATE IMAGES\n" + TextColor.END)
-
+    sys.stderr.write(TextColor.BLUE + "TOTAL RECORDS: " + str(total_records) + "\n" + TextColor.END)
     chunk_size = int(math.ceil(total_records/max_threads)) + 2
 
     for i in range(max_threads):
-        st = time.time()
         start_index = i * chunk_size
         end_index = min((i + 1) * chunk_size - 1, len(all_records)-1)
         records = all_records[start_index:end_index]
-        print('Starting: ', len(records))
         args = (chr_name, bam_file, ref_file, records, output_dir, str(i))
 
         p = multiprocessing.Process(target=generate_pileup, args=args)
         p.start()
-        p.join()
         while True:
             if len(multiprocessing.active_children()) < max_threads:
                 break
-        print('TIME PROFILE: ', time.time()-st)
-        exit()
 
 
 def create_output_dir_for_chromosome(output_dir, chr_name):
