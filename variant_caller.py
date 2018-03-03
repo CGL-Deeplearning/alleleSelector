@@ -47,7 +47,7 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
     predict_loader = DataLoader(predict_dset,
                                 batch_size=batch_size,
                                 shuffle=False,
-                                num_workers=1,
+                                num_workers=32,
                                 pin_memory=gpu_mode)
 
     model = torch.load(model_path)
