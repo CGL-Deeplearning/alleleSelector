@@ -123,7 +123,7 @@ class Inception3(nn.Module):
             return x, aux
         print(x.size())
         if self.training is False:
-            m = nn.LogSoftmax()
+            m = nn.Softmax()
             x = m(x)
         print(x.size())
         return x
