@@ -34,6 +34,7 @@ class Inception3(nn.Module):
 
     def __init__(self, num_classes=3, aux_logits=False, transform_input=False):
         super(Inception3, self).__init__()
+        self.num_classes = num_classes
         self.aux_logits = aux_logits
         self.transform_input = transform_input
         self.Conv2d_1a_3x3 = BasicConv2d(7, 32, kernel_size=3, stride=2)
@@ -123,7 +124,7 @@ class Inception3(nn.Module):
             return x, aux
         print(x.size())
         if self.training is False:
-            m = nn.Softmax(x.size())
+            m = nn.Softmax(dim=(1, self.num_classes))
             x = m(x)
         print(x.size())
         return x
