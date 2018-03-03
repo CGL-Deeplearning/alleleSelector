@@ -120,8 +120,10 @@ class Inception3(nn.Module):
         # 1000 (num_classes)
         if self.training and self.aux_logits:
             return x, aux
+        print(x.size())
         if self.training is False:
             x = nn.LogSoftmax(x)
+        print(x.size())
         return x
 
 
