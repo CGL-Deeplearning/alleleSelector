@@ -61,6 +61,7 @@ def predict(bam_file, ref_file, prediction_set, batch_size, model_path, gpu_mode
             images = images.cuda()
 
         preds = model(images)
+        print(record[0])
         print(preds)
         exit()
 
