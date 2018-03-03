@@ -11,8 +11,9 @@ from modules.deepore.dataloader_pred import DataSetLoader
 from modules.TextColor import TextColor
 from image_analyzer import *
 
+
 def get_images_for_two_alts(rec_id, record):
-    chr_name, pos_start, pos_end, ref, alt1, alt2, rec_type = record.rstrip().split('\t')
+    chr_name, pos_start, pos_end, ref, alt1, alt2, rec_type = record.rstrip().split('\t')[0:7]
     rec_1 = [rec_id, chr_name, pos_start, pos_end, ref, alt1, '.', rec_type]
     rec_2 = [rec_id, chr_name, pos_start, pos_end, ref, alt2, '.', rec_type]
     rec_3 = [rec_id, chr_name, pos_start, pos_end, ref, alt1, alt2,rec_type]
