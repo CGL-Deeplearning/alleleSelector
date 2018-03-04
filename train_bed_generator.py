@@ -221,7 +221,7 @@ def genome_level_parallelization(bam_file, ref_file, vcf_file, output_dir_path, 
     #             "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22"]
     program_start_time = time.time()
 
-    chr_list = ["chr3"]
+    chr_list = ["chr19"]
 
     # each chormosome in list
     for chr in chr_list:
