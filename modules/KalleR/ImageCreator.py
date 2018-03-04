@@ -13,9 +13,11 @@ MAX_COLOR_VALUE = 254.0
 BASE_QUALITY_CAP = 40.0
 MAP_QUALITY_CAP = 60.0
 MAP_QUALITY_FILTER = 10.0
+MIN_DELETE_QUALITY = 20.0
 MATCH_CIGAR_CODE = 0
 INSERT_CIGAR_CODE = 1
 DELETE_CIGAR_CODE = 2
+
 
 class imageChannels:
     """
@@ -157,13 +159,14 @@ class imageChannels:
         :param base: Reference base
         :return: [color spectrum of channels based on some default values]
         """
+        cigar_code = MATCH_CIGAR_CODE if base != '*' else INSERT_CIGAR_CODE
         base_color = imageChannels.get_base_color(base)
-        base_quality_color = imageChannels.get_base_quality_color(60)
+        base_quality_color = imageChannels.get_base_quality_color(BASE_QUALITY_CAP)
         map_quality_color = imageChannels.get_map_quality_color(60)
         strand_color = imageChannels.get_strand_color(is_rev=False)
         match_color = imageChannels.get_match_ref_color(is_match=True)
         support_color = imageChannels.get_alt_support_color(is_in_support=True)
-        cigar_color = imageChannels.get_cigar_color(MATCH_CIGAR_CODE)
+        cigar_color = imageChannels.get_cigar_color(cigar_code)
         return [base_color, base_quality_color, map_quality_color, strand_color, match_color, support_color, cigar_color]
 
     # RGB image creator
@@ -364,7 +367,7 @@ class ImageCreator:
             return pileupcolumn.pos, \
                    pileupread.alignment.query_name,\
                    '*', \
-                   0,\
+                   MIN_DELETE_QUALITY,\
                    pileupread.alignment.mapping_quality, \
                    pileupread.alignment.is_reverse, \
                    DELETE_CIGAR_CODE # CIGAR OPERATION DELETE

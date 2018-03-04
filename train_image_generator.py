@@ -48,14 +48,14 @@ def generate_pileup(contig, bam_file, ref_file, records, output_dir, thread_name
 
 
 def get_combined_gt(gt1, gt2):
-    if gt1 == 0:
+    if gt1 == '0':
         return gt2
-    if gt2 == 0:
+    if gt2 == '0':
         return gt1
-    if gt1 == 0 and gt2 == 0:
-        return 0
-    if gt1 == 1 and gt2 == 1:
-        return 2
+    if gt1 == '0' and gt2 == '0':
+        return '0'
+    if gt1 == '1' and gt2 == '1':
+        return '2'
     return None
 
 
@@ -69,10 +69,8 @@ def get_images_for_two_alts(record):
     gt1, filter1, gt2, filter2 = record.rstrip().split('\t')[7:11]
     _initialize_class_count_dictionary(chr_name)
 
-    gt1 = int(gt1)
-    gt2 = int(gt2)
-    class_count[chr_name][str(gt1)] += 1
-    class_count[chr_name][str(gt2)] += 1
+    class_count[chr_name][gt1] += 1
+    class_count[chr_name][gt2] += 1
     gt3 = get_combined_gt(gt1, gt2)
     if gt3 is None:
         sys.stderr.write(TextColor.RED + "WEIRD RECORD: " + str(record) + "\n")
@@ -143,7 +141,7 @@ def get_prediction_set_from_bed(candidate_bed):
         for prediction in train_set[chr]:
             alt2 = prediction[5]
             gt = prediction[7]
-            if gt == 0 and alt2 == '.' and select_or_not(downsample_rate) is False:
+            if gt == '0' and alt2 == '.' and select_or_not(downsample_rate) is False:
                 continue
             downsampled_list.append(prediction)
         train_set[chr] = downsampled_list
