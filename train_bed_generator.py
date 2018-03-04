@@ -312,7 +312,6 @@ if __name__ == '__main__':
     parser.add_argument(
         "--chromosome_name",
         type=str,
-        default="chr3",
         help="Desired chromosome name E.g.: chr3"
     )
     parser.add_argument(
