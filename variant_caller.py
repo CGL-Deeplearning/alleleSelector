@@ -1,11 +1,9 @@
-import argparse
 import sys
-import os
 import time
 
 import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
+from torch.utils.data import DataLoader
+from torchvision import transforms
 from torch.autograd import Variable
 from modules.deepore.dataloader_pred import DataSetLoader
 from modules.TextColor import TextColor

@@ -371,7 +371,7 @@ class CandidateFinder:
             alt1, alt2 = alt2, alt1
         ref, alt1 = alt1, ref
         pos_end = pos + len(ref) - 1
-        return [self.chromosome_name, pos, pos, ref, alt1, alt2, 'DEL']
+        return [self.chromosome_name, pos, pos_end, ref, alt1, alt2, 'DEL']
 
     def parse_reads_and_select_candidates(self, reads):
         """
@@ -394,12 +394,14 @@ class CandidateFinder:
                 continue
 
             ref = self.reference_dictionary[pos]
+
             for type_of_record in self.positional_allele_dictionary[pos]:
                 if type_of_record == MATCH_ALLELE:
                     continue
                 all_allele_dictionary = self.positional_allele_dictionary[pos][type_of_record]
                 # pick the top 2 most frequent allele
-                allele_frequency_list = list(sorted(all_allele_dictionary.items(), key=operator.itemgetter(1)))[:PLOIDY]
+                allele_frequency_list = list(sorted(all_allele_dictionary.items(), key=operator.itemgetter(1), reverse=True))[:PLOIDY]
+
                 allele_list = self._filter_alleles(pos, allele_frequency_list)
                 alt1 = allele_list[0] if len(allele_list) >= 1 else None
                 alt2 = allele_list[1] if len(allele_list) >= 2 else '.'

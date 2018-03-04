@@ -1,6 +1,11 @@
 import argparse
 import csv
 
+def filter_or_not(alt1, filter1, alt2, filter2, in_confident):
+    if alt2 == '.' and (filter1 == 'PASS' or filter1 == '.') and in_confident == 1:
+        return 1
+    elif (filter1 == 'PASS' or filter1 == '.') and (filter2 == 'PASS' or filter2 == '.') and in_confident == 1:
+        return 1
 
 def filter_bed(bed_file_path):
     """
@@ -11,10 +16,15 @@ def filter_bed(bed_file_path):
     """
     tsv_file = open(bed_file_path, 'r')
     reader = csv.reader(tsv_file, delimiter='\t')
-
+    # chr3	111205	111205	C	T	.	SUB	1	TruthSensitivityTranche99.00to99.90	0	.	1
     for line in reader:
-        in_confident = int(line[7])
-        if in_confident == 1:
+        alt1 = line[3]
+        alt2 = line[4]
+        filter1 = line[8]
+        filter2 = line[10]
+        in_confident = int(line[11])
+
+        if filter_or_not(alt1, filter1, alt2, filter2, in_confident):
             print('\t'.join(line))
 
 

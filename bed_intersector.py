@@ -1,8 +1,8 @@
 import argparse
-from modules.IntervalTree import IntervalTree
-from modules.TsvHandler import TsvHandler
 import csv
 
+from modules.IntervalTree import IntervalTree
+from modules.TsvHandler import TsvHandler
 
 def intersect(bed_file_path_query, bed_file_path_reference):
     """
