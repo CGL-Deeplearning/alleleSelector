@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from torch.autograd import Variable
 
-from modules.deepore.inception import Inception3
+from modules.inception import Inception3
 from modules.deepore.dataset import PileupDataset, TextColor
 np.set_printoptions(threshold=np.nan)
 

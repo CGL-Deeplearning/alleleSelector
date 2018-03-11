@@ -13,7 +13,7 @@ class Bed2ImageAPI:
         self.fasta_handler = FastaHandler(reference_file_path)
 
     @staticmethod
-    def create_image(bam_handler, fasta_handler, record):
+    def create_image(bam_handler, fasta_handler, record, out_dir, file_name):
         """
         Create an image from a bed record
         :param bam_handler: Handles bam file
@@ -32,5 +32,5 @@ class Bed2ImageAPI:
         image_creator = ImageCreator(fasta_handler, pileups, contig, start_position, alts)
 
         image_array, image_shape = image_creator.create_image(start_position, ref, alts)
-
+        image_creator.save_image_as_png(image_array, out_dir, file_name)
         return image_array, image_shape
