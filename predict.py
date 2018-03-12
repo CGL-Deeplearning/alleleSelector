@@ -23,7 +23,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
     testloader = DataLoader(test_dset,
                             batch_size=batch_size,
                             shuffle=False,
-                            num_workers=16,
+                            num_workers=72,
                             pin_memory=gpu_mode # CUDA only
                             )
 
