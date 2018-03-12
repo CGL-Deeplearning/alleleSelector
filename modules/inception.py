@@ -14,7 +14,7 @@ model_urls = {
 
 
 def inception_v3(pretrained=False, **kwargs):
-    r"""Inception v3 model architecture from
+    """Inception v3 model architecture from
     `"Rethinking the Inception Architecture for Computer Vision" <http://arxiv.org/abs/1512.00567>`_.
 
     Args:
