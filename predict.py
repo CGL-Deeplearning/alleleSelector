@@ -45,8 +45,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.cpu()
     else:
         model = torch.load(model_path)
-        model = torch.nn.DataParallel(model).cuda()
-        print(model)
+        model = model.cuda()
 
     model.eval()  # Change model to 'eval' mode (BN uses moving mean/var).
 
