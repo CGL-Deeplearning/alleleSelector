@@ -45,7 +45,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.cpu()
     else:
         model = torch.load(model_path)
-        model.cuda()
+        model = torch.nn.DataParallel(model).cuda()
         print(model)
 
     model.eval()  # Change model to 'eval' mode (BN uses moving mean/var).
@@ -56,7 +56,9 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         if gpu_mode:
             images = images.cuda()
 
-        preds = model(images).data.cpu()
+        preds = model(images)
+        print(preds.size())
+        exit()
         for i in range(0, preds.size(0)):
             rec = records[i]
             rec_id, chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type = rec.rstrip().split(' ')
