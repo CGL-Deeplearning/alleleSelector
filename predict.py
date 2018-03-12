@@ -8,7 +8,7 @@ from torchvision import transforms, utils
 from torch.autograd import Variable
 from pysam import VariantFile, VariantHeader, VariantRecord
 import torchnet.meter as meter
-from modules.inception import Inception3
+from modules.deepore.inception import Inception3
 from modules.deepore.dataset_prediction import PileupDataset, TextColor
 from collections import defaultdict
 
@@ -44,9 +44,10 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.load_state_dict(new_state_dict)
         model.cpu()
     else:
-        params = torch.load(model_path)['state_dict']
+        params = torch.load(model_path)
+        state_dict = params['state_dict']
         model = Inception3()
-        model.load_state_dict(params)
+        model.load_state_dict(state_dict)
         model.cuda()
 
     model.eval()  # Change model to 'eval' mode (BN uses moving mean/var).

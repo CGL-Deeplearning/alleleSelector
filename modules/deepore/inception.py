@@ -122,7 +122,6 @@ class Inception3(nn.Module):
             return x, aux
 
         if self.training is False:
-            print("HERE")
             return nn.Softmax(x)
         return x
 
