@@ -44,10 +44,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.load_state_dict(new_state_dict)
         model.cpu()
     else:
-        params = torch.load(model_path)
-        state_dict = params['state_dict']
-        model = Inception3()
-        model.load_state_dict(state_dict)
+        model = torch.load(model_path)
         model.cuda()
 
     model.eval()  # Change model to 'eval' mode (BN uses moving mean/var).
