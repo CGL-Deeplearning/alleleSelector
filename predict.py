@@ -55,11 +55,11 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         if gpu_mode:
             images = images.cuda()
 
-        preds = model(images)
+        preds = model(images).cpu()
         for i in range(0, preds.size(0)):
             rec = records[i]
             rec_id, chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type = rec.rstrip().split(' ')
-            probs = preds[i].numpy()
+            probs = preds[i].data.numpy()
             prob_hom, prob_het, prob_hom_alt = probs
             prediction_dict[rec_id].append((chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type, prob_hom, prob_het, prob_hom_alt))
         sys.stderr.write(TextColor.BLUE+ " BATCHES DONE: " + str(counter) + "/" + str(len(testloader)) + "\n" + TextColor.END)
