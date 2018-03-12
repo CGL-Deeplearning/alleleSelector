@@ -23,7 +23,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
     testloader = DataLoader(test_dset,
                             batch_size=batch_size,
                             shuffle=False,
-                            num_workers=1,
+                            num_workers=16,
                             pin_memory=gpu_mode # CUDA only
                             )
 
@@ -44,8 +44,10 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.load_state_dict(new_state_dict)
         model.cpu()
     else:
-        model = torch.load(model_path)
-        model = model.cuda()
+        params = torch.load(model_path)
+        model = Inception3()
+        model.load_state_dict(params)
+        model.cuda()
 
     model.eval()  # Change model to 'eval' mode (BN uses moving mean/var).
 
@@ -55,13 +57,14 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         if gpu_mode:
             images = images.cuda()
 
-        preds = model(images).cpu()
+        preds = model(images).data.cpu()
         for i in range(0, preds.size(0)):
             rec = records[i]
             rec_id, chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type = rec.rstrip().split(' ')
-            probs = preds[i].data.numpy()
+            probs = preds[i].numpy()
             prob_hom, prob_het, prob_hom_alt = probs
             prediction_dict[rec_id].append((chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type, prob_hom, prob_het, prob_hom_alt))
+        sys.stderr.write(TextColor.BLUE+ " BATCHES DONE: " + str(counter) + "/" + str(len(testloader)) + "\n" + TextColor.END)
 
     return prediction_dict
 
