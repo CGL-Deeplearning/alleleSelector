@@ -44,7 +44,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
         model.load_state_dict(new_state_dict)
         model.cpu()
     else:
-        params = torch.load(model_path)
+        params = torch.load(model_path)['state_dict']
         model = Inception3()
         model.load_state_dict(params)
         model.cuda()
