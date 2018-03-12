@@ -53,6 +53,8 @@ class PileupDataset(Dataset):
 
         img = np.reshape(np_array_of_img, shape)
         img = np.transpose(img, (0, 1, 2))
+        if self.transform is not None:
+            img = self.transform(img)
         pic_name = self.X_train[index]
         rec = self.rec[index]
         return img, pic_name, rec
