@@ -116,7 +116,7 @@ def get_vcf_header():
              ('Type', 'String'),
              ('Description', "Genotype")]
     header.add_meta(key='FORMAT', items=items)
-    items = [('ID', "chr3"),
+    items = [('ID', "chr19"),
              ('length', 198022430)]
     header.add_meta(key='contig', items=items)
     header.add_sample('NA12878')
