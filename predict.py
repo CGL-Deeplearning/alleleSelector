@@ -69,7 +69,8 @@ def predict(test_file, batch_size, model_path, gpu_mode):
 
 def get_genotype_for_multiple_allele(records):
     ref = '.'
-    pos = 0
+    st_pos = 0
+    end_pos = 0
     chrm = ''
     rec_alt1 = '.'
     rec_alt2 = '.'
@@ -77,7 +78,8 @@ def get_genotype_for_multiple_allele(records):
     for record in records:
         chrm = record[0]
         ref = record[3]
-        pos = record[2]
+        st_pos = record[1]
+        end_pos = record[2]
         alt1 = record[4]
         alt2 = record[5]
         if alt1 != '.' and alt2 != '.':
@@ -95,7 +97,7 @@ def get_genotype_for_multiple_allele(records):
     prob_list = [p00, p01, p11, p02, p22, p12]
     genotype_list = ['0/0', '0/1', '1/1', '0/2', '2/2', '1/2']
     val, index = max([(v, i) for i, v in enumerate(prob_list)])
-    return chrm, pos, ref, [rec_alt1, rec_alt2], genotype_list[index], val
+    return chrm, st_pos, end_pos, ref, [rec_alt1, rec_alt2], genotype_list[index], val
 
 
 def get_genotype_for_single_allele(records):
@@ -103,7 +105,7 @@ def get_genotype_for_single_allele(records):
         probs = [record[7], record[8], record[9]]
         genotype_list = ['0/0', '0/1', '1/1']
         val, index = max([(v, i) for i, v in enumerate(probs)])
-        return record[0], record[1], record[3], [record[4]], genotype_list[index], val
+        return record[0], record[1], record[2], record[3], [record[4]], genotype_list[index], val
 
 
 def get_vcf_header():
@@ -119,6 +121,9 @@ def get_vcf_header():
     items = [('ID', "chr19"),
              ('length', 198022430)]
     header.add_meta(key='contig', items=items)
+    items = [('ID', "chr3"),
+             ('length', 198022430)]
+    header.add_meta(key='contig', items=items)
     header.add_sample('NA12878')
     return header
 
@@ -129,10 +134,10 @@ def get_genotype_tuple(genotype):
     return tuple(split_values)
 
 
-def get_vcf_record(vcf_file, chrm, pos, ref, alts, genotype, phred_qual):
-    alleles = tuple(ref) + tuple(alts)
+def get_vcf_record(vcf_file, chrm, st_pos, end_pos, ref, alts, genotype, phred_qual):
+    alleles = tuple([ref]) + tuple(alts)
     genotype = get_genotype_tuple(genotype)
-    vcf_record = vcf_file.new_record(contig=chrm, start=int(pos), stop=int(pos)+1, id='.', qual=phred_qual,
+    vcf_record = vcf_file.new_record(contig=chrm, start=int(st_pos), id='.', qual=phred_qual,
                                      filter='PASS', alleles=alleles, GT=genotype)
     return vcf_record
 
@@ -144,12 +149,14 @@ def produce_vcf(prediction_dict):
         records = prediction_dict[rec_id]
 
         if len(records) > 1:
-            chrm, pos, ref, alt_field, genotype, val = get_genotype_for_multiple_allele(records)
+            chrm, st_pos, end_pos, ref, alt_field, genotype, val = get_genotype_for_multiple_allele(records)
         else:
-            chrm, pos, ref, alt_field, genotype, val = get_genotype_for_single_allele(records)
-        phred_qual = -10 * np.log10(1 - val)
+            chrm, st_pos, end_pos, ref, alt_field, genotype, val = get_genotype_for_single_allele(records)
+        # if genotype == '0/0':
+        #     continue
+        phred_qual = -10 * np.log10(1 - val) if 1-val >= 0.0000000001 else 60
         # print(chrm, pos, ref, alt_field, genotype, val)
-        vcf_rec = get_vcf_record(vcf, chrm, pos, ref, alt_field, genotype, phred_qual)
+        vcf_rec = get_vcf_record(vcf, chrm, st_pos, end_pos, ref, alt_field, genotype, phred_qual)
         # print(vcf_rec)
         vcf.write(vcf_rec)
 
