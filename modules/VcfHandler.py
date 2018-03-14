@@ -83,7 +83,7 @@ class VariantRecord:
     - Used for set values in VCF dictionary
     - Not used for filtering the VCF
     """
-    def __init__(self, pos, ref, qual, genotype_class, genotype_type, alt, filter, len):
+    def __init__(self, pos, ref, qual, genotype_class, genotype_type, alt, filter, len, genotype):
         """
         Get attributes of a record and set values.
         :param pos: Position in chromosome
@@ -102,6 +102,7 @@ class VariantRecord:
         self.genotype_class = genotype_class
         self.len = len
         self.filter = filter
+        self.genotype = genotype
 
     def __str__(self):
         """
@@ -109,7 +110,7 @@ class VariantRecord:
         :return: String to print
         """
         return_str = str(self.pos) + '\t' + str(int(self.qual)) + '\t' + str(self.ref) + '\t' + str(self.alt) +\
-                     '\t' + str(self.type) + '\t' + str(self.genotype_class)
+                     '\t' + str(self.type) + '\t' + str(self.genotype_class) + '\t' + str(self.filter) + '\t' + str(self.genotype)
         return return_str
 
 
@@ -234,17 +235,17 @@ class VCFFileProcessor:
         """
         if genotype_class == 'SNP':
             variant_record = VariantRecord(rec.rec_pos, rec.rec_ref, rec.rec_qual, genotype_class, genotype_type, alt,
-                                           rec.rec_filter, len=len(rec.rec_ref))
+                                           rec.rec_filter, len(rec.rec_ref), rec.rec_genotype)
             self._update_dictionary(variant_record)
         elif genotype_class == 'DEL':
             resolved_ref, resolved_alt = self._resolve_suffix_for_delete(rec.rec_ref, alt)
             variant_record = VariantRecord(rec.rec_pos, resolved_ref, rec.rec_qual, genotype_class, genotype_type, resolved_alt,
-                                           rec.rec_filter, len=len(rec.rec_ref))
+                                           rec.rec_filter, len(rec.rec_ref), rec.rec_genotype)
             self._update_dictionary(variant_record)
         elif genotype_class == 'IN':
             resolved_ref, resolved_alt = self._resolve_suffix_for_insert(rec.rec_ref, alt)
             variant_record = VariantRecord(rec.rec_pos, resolved_ref, rec.rec_qual, genotype_class, genotype_type, resolved_alt,
-                                           rec.rec_filter, len=len(alt))
+                                           rec.rec_filter, len(alt), rec.rec_genotype)
             self._update_dictionary(variant_record)
 
     def _update_count(self, genotype_type):
@@ -348,9 +349,14 @@ class VCFFileProcessor:
                 self.vcf_records = pysam.VariantFile(self.file_path).fetch(contig, start_pos, end_pos)
             except IOError:
                 sys.stderr.write("VCF FILE READ ERROR")
-        else:
+        elif contig is not None:
             try:
                 self.vcf_records = pysam.VariantFile(self.file_path).fetch(contig)
+            except IOError:
+                sys.stderr.write("VCF FILE READ ERROR")
+        else:
+            try:
+                self.vcf_records = pysam.VariantFile(self.file_path)
             except IOError:
                 sys.stderr.write("VCF FILE READ ERROR")
         # Filter the records

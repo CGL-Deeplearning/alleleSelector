@@ -2,15 +2,15 @@ import argparse
 import sys
 import torch
 import numpy as np
-from collections import OrderedDict
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from torch.autograd import Variable
 from pysam import VariantFile, VariantHeader, VariantRecord
-import torchnet.meter as meter
 from modules.deepore.inception import Inception3
 from modules.deepore.dataset_prediction import PileupDataset, TextColor
 from collections import defaultdict
+import operator
+import math
 
 
 def predict(test_file, batch_size, model_path, gpu_mode):
@@ -23,7 +23,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
     testloader = DataLoader(test_dset,
                             batch_size=batch_size,
                             shuffle=False,
-                            num_workers=72,
+                            num_workers=4,
                             pin_memory=gpu_mode # CUDA only
                             )
 
@@ -62,7 +62,7 @@ def predict(test_file, batch_size, model_path, gpu_mode):
             probs = preds[i].data.numpy()
             prob_hom, prob_het, prob_hom_alt = probs
             prediction_dict[rec_id].append((chr_name, pos_st, pos_end, ref, alt1, alt2, rec_type, prob_hom, prob_het, prob_hom_alt))
-        sys.stderr.write(TextColor.BLUE+ " BATCHES DONE: " + str(counter) + "/" + str(len(testloader)) + "\n" + TextColor.END)
+        sys.stderr.write(TextColor.BLUE+ " BATCHES DONE: " + str(counter+1) + "/" + str(len(testloader)) + "\n" + TextColor.END)
 
     return prediction_dict
 
@@ -137,7 +137,9 @@ def get_genotype_tuple(genotype):
 def get_vcf_record(vcf_file, chrm, st_pos, end_pos, ref, alts, genotype, phred_qual):
     alleles = tuple([ref]) + tuple(alts)
     genotype = get_genotype_tuple(genotype)
-    vcf_record = vcf_file.new_record(contig=chrm, start=int(st_pos), id='.', qual=phred_qual,
+    end_pos = int(end_pos)+1
+    st_pos = int(st_pos)
+    vcf_record = vcf_file.new_record(contig=chrm, start=st_pos, stop=end_pos, id='.', qual=phred_qual,
                                      filter='PASS', alleles=alleles, GT=genotype)
     return vcf_record
 
@@ -145,6 +147,7 @@ def get_vcf_record(vcf_file, chrm, st_pos, end_pos, ref, alts, genotype, phred_q
 def produce_vcf(prediction_dict):
     header = get_vcf_header()
     vcf = VariantFile('out.vcf', 'w', header=header)
+    all_calls = []
     for rec_id in sorted(prediction_dict.keys()):
         records = prediction_dict[rec_id]
 
@@ -152,9 +155,15 @@ def produce_vcf(prediction_dict):
             chrm, st_pos, end_pos, ref, alt_field, genotype, val = get_genotype_for_multiple_allele(records)
         else:
             chrm, st_pos, end_pos, ref, alt_field, genotype, val = get_genotype_for_single_allele(records)
-        # if genotype == '0/0':
-        #     continue
-        phred_qual = -10 * np.log10(1 - val) if 1-val >= 0.0000000001 else 60
+        if genotype == '0/0':
+             continue
+        phred_qual = min(60, -10 * np.log10(1 - val) if 1-val >= 0.0000000001 else 60)
+        phred_qual = math.ceil(phred_qual * 100.0) / 100.0
+        all_calls.append((chrm, st_pos, end_pos, ref, alt_field, genotype, phred_qual))
+
+    all_calls.sort(key=operator.itemgetter(1))
+    for record in all_calls:
+        chrm, st_pos, end_pos, ref, alt_field, genotype, phred_qual = record
         # print(chrm, pos, ref, alt_field, genotype, val)
         vcf_rec = get_vcf_record(vcf, chrm, st_pos, end_pos, ref, alt_field, genotype, phred_qual)
         # print(vcf_rec)
