@@ -159,7 +159,7 @@ def produce_vcf(prediction_dict):
              continue
         phred_qual = min(60, -10 * np.log10(1 - val) if 1-val >= 0.0000000001 else 60)
         phred_qual = math.ceil(phred_qual * 100.0) / 100.0
-        all_calls.append((chrm, st_pos, end_pos, ref, alt_field, genotype, phred_qual))
+        all_calls.append((chrm, int(st_pos), int(end_pos), ref, alt_field, genotype, phred_qual))
 
     all_calls.sort(key=operator.itemgetter(1))
     for record in all_calls:
