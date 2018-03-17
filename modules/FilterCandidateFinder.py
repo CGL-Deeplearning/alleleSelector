@@ -23,7 +23,7 @@ MERGE_WINDOW_OFFSET = 0
 MIN_MISMATCH_THRESHOLD = 3
 MIN_MISMATCH_PERCENT_THRESHOLD = 4
 MIN_COVERAGE_THRESHOLD = 10
-PLOIDY = 2
+PLOIDY = 8
 MATCH_ALLELE = 0
 MISMATCH_ALLELE = 1
 INSERT_ALLELE = 2
@@ -388,30 +388,57 @@ class CandidateFinder:
                 total_reads += 1
         # print('Read processing time', time.time()-start_time)
 
-        selected_allele_list = []
+        positional_selected_alleles = dict()
+
         for pos in range(self.region_start_position, self.region_end_position):
             if pos not in self.positional_allele_dictionary:
                 continue
 
             ref = self.reference_dictionary[pos]
 
+            # generate a 3 position list, 1 for each edit type
+            position_data = [list() for type in [MISMATCH_ALLELE, INSERT_ALLELE, DELETE_ALLELE]]
+            position_supported = False
+
             for type_of_record in self.positional_allele_dictionary[pos]:
                 if type_of_record == MATCH_ALLELE:
                     continue
                 all_allele_dictionary = self.positional_allele_dictionary[pos][type_of_record]
+
                 # pick the top 2 most frequent allele
                 allele_frequency_list = list(sorted(all_allele_dictionary.items(), key=operator.itemgetter(1), reverse=True))[:PLOIDY]
 
                 allele_list = self._filter_alleles(pos, allele_frequency_list)
+
+                # technically this should be expanded to scale with PLOIDY parameter...
                 alt1 = allele_list[0] if len(allele_list) >= 1 else None
                 alt2 = allele_list[1] if len(allele_list) >= 2 else '.'
+
+                # if there are no edits of this type, skip
                 if alt1 is None:
                     continue
-                if type_of_record == MISMATCH_ALLELE:
-                    selected_allele_list.append(self._get_substitution_record(pos, alt1, alt2, ref))
-                elif type_of_record == INSERT_ALLELE:
-                    selected_allele_list.append(self._get_insert_record(pos, alt1, alt2, ref))
-                elif type_of_record == DELETE_ALLELE:
-                    selected_allele_list.append(self._get_delete_record(pos, alt1, alt2, ref))
+                else:
+                    # split allele strings and frequencies into their own single typed lists
+                    alleles, frequencies = map(list, zip(*allele_frequency_list))
+                    coverage = self.coverage[pos]
+                    filtering_data = [alleles, frequencies, coverage]
 
-        return selected_allele_list
+                if type_of_record == MISMATCH_ALLELE:
+                    record_data = self._get_substitution_record(pos, alt1, alt2, ref)
+                    position_data[type_of_record-1] = record_data + filtering_data
+                    position_supported = True
+
+                elif type_of_record == INSERT_ALLELE:
+                    record_data = self._get_insert_record(pos, alt1, alt2, ref)
+                    position_data[type_of_record-1] = record_data + filtering_data
+                    position_supported = True
+
+                elif type_of_record == DELETE_ALLELE:
+                    record_data = self._get_delete_record(pos, alt1, alt2, ref)
+                    position_data[type_of_record-1] = record_data + filtering_data
+                    position_supported = True
+
+            if position_supported:
+                positional_selected_alleles[pos] = position_data
+
+        return positional_selected_alleles
