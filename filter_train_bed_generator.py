@@ -104,7 +104,6 @@ class View:
                                                               positional_vcf=positional_variants,
                                                               candidate_sites=selected_candidate_list)
 
-        self.write_training_set(labeled_sites, start_position, end_position)
 
         return labeled_sites
 
@@ -134,7 +133,9 @@ class View:
             print("#####----CANDIDATES-----#####")
 
         labeled_sites = self.get_labeled_candidate_sites(selected_candidates, start_position, end_position, True)
-        self.write_bed(start_position, end_position, labeled_sites)
+        self.write_training_set(labeled_sites, start_position, end_position)
+
+        # self.write_bed(start_position, end_position, labeled_sites)
 
     def test(self):
         """

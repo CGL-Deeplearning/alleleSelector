@@ -239,7 +239,7 @@ class CandidateLabeler:
 
         data_vector = numpy.array(data_list).reshape((len(data_list),1))
 
-        print('\t'.join(map(str, data_list)))
+        # print('\t'.join(map(str, data_list)))
 
         return data_vector
 
