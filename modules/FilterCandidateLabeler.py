@@ -226,20 +226,29 @@ class CandidateLabeler:
     def _generate_data_vector(self, chromosome_name, start, genotypes, frequencies, alleles, coverage, support):
         data_list = list()
 
+        # convert list of frequencies into vector with length 3*PLOIDY
         site_frequency_list = self._generate_fixed_size_freq_list(frequencies)
+
+        # normalize by coverage depth
+        site_frequency_vector = numpy.array(site_frequency_list,dtype=numpy.float32)/coverage
+
         chromosome_number = self._get_chromosome_number(chromosome_name)
         label = int(support)
 
-        data_list.append(chromosome_number)
-        data_list.append(start)
-        data_list.extend(genotypes)
-        data_list.extend(site_frequency_list)
-        data_list.append(coverage)
-        data_list.append(label)
+        # cap and normalize coverage (max = 1000)
+        coverage = min(coverage,1000)
+        coverage = float(coverage)/1000
 
-        data_vector = numpy.array(data_list).reshape((len(data_list),1))
+        data_list.append(chromosome_number) # 0
+        data_list.append(start)             # 1
+        data_list.extend(genotypes)         # 2-4
+        data_list.extend([0]*PLOIDY*3)      # 5-28
+        data_list.append(coverage)          # 29
+        data_list.append(label)             # 30
 
-        # print('\t'.join(map(str, data_list)))
+        data_vector = numpy.array(data_list,dtype=numpy.float32).reshape((len(data_list),1))
+
+        data_vector[5:29] = site_frequency_vector.reshape((PLOIDY*3,1))
 
         return data_vector
 
@@ -263,7 +272,6 @@ class CandidateLabeler:
             site_alleles = list()
             site_genotypes = list()
 
-            site_chromosome_name = chromosome_name
             site_start = None
             site_coverage = None
 
