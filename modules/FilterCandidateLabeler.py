@@ -265,7 +265,7 @@ class CandidateLabeler:
         data_vector[l:l+PLOIDY*3] = site_frequency_vector.reshape((PLOIDY*3,1))
 
         # print(filter,int(filter))
-        print(numpy.array2string(data_vector.T, separator="\t", precision=4, max_line_width=500))
+        # print(numpy.array2string(data_vector.T, separator="\t", precision=4, max_line_width=500))
 
         return data_vector
 
