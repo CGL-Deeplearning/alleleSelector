@@ -223,7 +223,7 @@ class CandidateLabeler:
 
         return number
 
-    def _generate_data_vector(self, chromosome_name, start, genotypes, frequencies, alleles, coverage, support):
+    def _generate_data_vector(self, chromosome_name, start, genotypes, frequencies, alleles, coverage, support, filter):
         data_list = list()
 
         # convert list of frequencies into vector with length 3*PLOIDY
@@ -242,13 +242,20 @@ class CandidateLabeler:
         data_list.append(chromosome_number) # 0
         data_list.append(start)             # 1
         data_list.extend(genotypes)         # 2-4
-        data_list.extend([0]*PLOIDY*3)      # 5-28
-        data_list.append(coverage)          # 29
-        data_list.append(label)             # 30
+        data_list.append(int(filter))       # 5
+        l = len(data_list)
+        data_list.extend([0]*PLOIDY*3)      # 6-29
+        data_list.append(coverage)          # 30
+        data_list.append(label)             # 31
 
+        # convert data list to numpy Float vector
         data_vector = numpy.array(data_list, dtype=numpy.float32).reshape((len(data_list),1))
 
-        data_vector[5:29] = site_frequency_vector.reshape((PLOIDY*3,1))
+        # add normalized frequency vector values to the full data vector
+        data_vector[l:l+PLOIDY*3] = site_frequency_vector.reshape((PLOIDY*3,1))
+
+        # print(filter,int(filter))
+        # print(numpy.array2string(data_vector.T, separator="\t", precision=4, max_line_width=500))
 
         return data_vector
 
@@ -313,7 +320,6 @@ class CandidateLabeler:
                     site_alleles.append(all_allele_sequences)
                     site_genotypes.append(genotype[0])
 
-
                 else:
                     # generate null vectors, since the site contains no edits of this type
                     frequencies = [0]*PLOIDY
@@ -323,18 +329,18 @@ class CandidateLabeler:
                     site_alleles.append(all_allele_sequences)
                     site_genotypes.append(0)
 
-            if site_PASS:
-                support = self._is_supported(site_genotypes)
+            support = self._is_supported(site_genotypes)
 
-                vector = self._generate_data_vector(chromosome_name=chromosome_name,
-                                                    start=site_start,
-                                                    genotypes=site_genotypes,
-                                                    frequencies=site_frequencies,
-                                                    alleles=site_alleles,
-                                                    coverage=site_coverage,
-                                                    support=support)
+            vector = self._generate_data_vector(chromosome_name=chromosome_name,
+                                                start=site_start,
+                                                genotypes=site_genotypes,
+                                                frequencies=site_frequencies,
+                                                alleles=site_alleles,
+                                                coverage=site_coverage,
+                                                support=support,
+                                                filter=site_PASS)
 
-                all_labeled_vectors.append(vector)
+            all_labeled_vectors.append(vector)
 
         # if there is no data for this region, append an empty vector
         if len(all_labeled_vectors) == 0:
