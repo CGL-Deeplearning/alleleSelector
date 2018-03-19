@@ -1,6 +1,8 @@
 from collections import defaultdict
+from modules.IterativeAverage import IterativeAverage
 import operator
 import time
+
 """
 CandidateFinder finds possible positions based on edits we see in reads.
 It parses through each read of a site and finds possible candidate positions.
@@ -17,6 +19,7 @@ Other data structures:
 Merged_windows is constructed from candidate_positions. If two positions fall within
 MERGE_WINDOW_DISTANCE we merge them in a single window.
 """
+
 DEFAULT_MIN_MAP_QUALITY = 5
 MERGE_WINDOW_DISTANCE = 0
 MERGE_WINDOW_OFFSET = 0
@@ -56,6 +59,8 @@ class CandidateFinder:
         self.mismatch_count = defaultdict(int)
         self.edit_count = defaultdict(int)
         self.candidate_positions = set()
+        self.map_quality = defaultdict(IterativeAverage)
+        self.base_quality = defaultdict(IterativeAverage)
 
         # the base and the insert dictionary for finding alleles
         self.snp_dictionary = {}
@@ -109,7 +114,7 @@ class CandidateFinder:
 
         self.positional_allele_dictionary[pos][type][allele] += 1
 
-    def parse_match(self, alignment_position, length, read_sequence, ref_sequence, read_name):
+    def parse_match(self, alignment_position, length, read_sequence, ref_sequence, read_name, read_base_qualities, read_mapping_quality):
         """
         Process a cigar operation that is a match
         :param alignment_position: Position where this match happened
@@ -123,8 +128,12 @@ class CandidateFinder:
         """
         start = alignment_position
         stop = start + length
+
         for i in range(start, stop):
             self.coverage[i] += 1
+            self.map_quality[i].update(read_mapping_quality)
+            self.base_quality[i].update(read_base_qualities[i-alignment_position])
+
             allele = read_sequence[i-alignment_position]
             ref = ref_sequence[i-alignment_position]
 
@@ -165,7 +174,7 @@ class CandidateFinder:
         # record the delete where it first starts
         self._update_read_allele_dictionary(alignment_position + 1, allele, DELETE_ALLELE)
 
-    def parse_insert(self, alignment_position, read_sequence, read_name):
+    def parse_insert(self, alignment_position, read_sequence, read_name, read_base_qualities):
         """
         Process a cigar operation where there is an insert
         :param alignment_position: Position where the insert happened
@@ -178,6 +187,10 @@ class CandidateFinder:
 
         self.edit_count[alignment_position] += 1
         self.mismatch_count[alignment_position] += 1
+
+        # calculate the average base quality for the entire insert segment and update the positional base quality
+        average_base_quality = sum(read_base_qualities)/len(read_base_qualities)
+        self.base_quality[alignment_position].update(average_base_quality)
 
         # the allele is the anchor + what's being deleted
         allele = self.reference_dictionary[alignment_position] + read_sequence
@@ -233,6 +246,8 @@ class CandidateFinder:
         ref_alignment_stop = self.get_read_stop_position(read)
         cigar_tuples = read.cigartuples
         read_sequence = read.query_sequence.upper()
+        read_base_qualities = read.query_qualities
+        read_mapping_quality = read.mapping_quality
         ref_sequence = self.fasta_handler.get_sequence(chromosome_name=self.chromosome_name,
                                                        start=ref_alignment_start,
                                                        stop=ref_alignment_stop)
@@ -251,6 +266,7 @@ class CandidateFinder:
             # get the sequence segments that are effected by this operation
             ref_sequence_segment = ref_sequence[ref_index:ref_index+length]
             read_sequence_segment = read_sequence[read_index:read_index+length]
+            read_base_qualities_segment = read_base_qualities[read_index:read_index+length]
 
             # send the cigar tuple to get attributes we got by this operation
             ref_index_increment, read_index_increment = \
@@ -259,7 +275,9 @@ class CandidateFinder:
                                        alignment_position=ref_alignment_start+ref_index,
                                        ref_sequence=ref_sequence_segment,
                                        read_sequence=read_sequence_segment,
-                                       read_name=read.query_name)
+                                       read_name=read.query_name,
+                                       read_base_qualities=read_base_qualities_segment,
+                                       read_mapping_quality=read_mapping_quality)
 
             # increase the read index iterator
             read_index += read_index_increment
@@ -283,7 +301,7 @@ class CandidateFinder:
                     # it's an insert or delete, so, add to the previous position
                     self._update_positional_allele_dictionary(position-1, allele, allele_type)
 
-    def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name):
+    def parse_cigar_tuple(self, cigar_code, length, alignment_position, ref_sequence, read_sequence, read_name, read_base_qualities, read_mapping_quality):
         """
         Parse through a cigar operation to find possible candidate variant positions in the read
         :param cigar_code: Cigar operation code
@@ -315,14 +333,17 @@ class CandidateFinder:
                              length=length,
                              read_sequence=read_sequence,
                              ref_sequence=ref_sequence,
-                             read_name=read_name)
+                             read_name=read_name,
+                             read_base_qualities=read_base_qualities,
+                             read_mapping_quality=read_mapping_quality)
         elif cigar_code == 1:
             # insert
             # alignment position is where the next alignment starts, for insert and delete this
             # position should be the anchor point hence we use a -1 to refer to the anchor point
             self.parse_insert(alignment_position=alignment_position-1,
                               read_sequence=read_sequence,
-                              read_name=read_name)
+                              read_name=read_name,
+                              read_base_qualities=read_base_qualities)
             ref_index_increment = 0
         elif cigar_code == 2 or cigar_code == 3:
             # delete or ref_skip
@@ -421,7 +442,10 @@ class CandidateFinder:
                     # split allele strings and frequencies into their own single typed lists
                     alleles, frequencies = map(list, zip(*allele_frequency_list))
                     coverage = self.coverage[pos]
-                    filtering_data = [alleles, frequencies, coverage]
+                    map_quality = self.map_quality[pos].get_average()
+                    base_quality = self.base_quality[pos].get_average()
+
+                    filtering_data = [alleles, frequencies, coverage, map_quality, base_quality]
 
                 if type_of_record == MISMATCH_ALLELE:
                     record_data = self._get_substitution_record(pos, alt1, alt2, ref)

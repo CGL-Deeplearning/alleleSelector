@@ -43,6 +43,8 @@ CANDIDATE_TYPE = 6
 ALLELES = 7
 FREQUENCIES = 8
 COVERAGE = 9
+MAP_QUALITY = 10
+BASE_QUALITY = 11
 
 # Positional vcf indexes
 SNP, IN, DEL = 0, 1, 2
@@ -223,7 +225,7 @@ class CandidateLabeler:
 
         return number
 
-    def _generate_data_vector(self, chromosome_name, start, genotypes, frequencies, alleles, coverage, support, filter):
+    def _generate_data_vector(self, chromosome_name, start, genotypes, frequencies, alleles, coverage, map_quality, base_quality, support, vcf_filter):
         data_list = list()
 
         # convert list of frequencies into vector with length 3*PLOIDY
@@ -239,14 +241,22 @@ class CandidateLabeler:
         coverage = min(coverage, 1000)
         coverage = float(coverage)/1000
 
+        # cap and normalize qualities (max = 1000)
+        map_quality = min(map_quality, 1000)
+        map_quality = float(map_quality)/1000
+        base_quality = min(base_quality, 1000)
+        base_quality = float(base_quality)/1000
+
         data_list.append(chromosome_number) # 0
         data_list.append(start)             # 1
         data_list.extend(genotypes)         # 2-4
-        data_list.append(int(filter))       # 5
+        data_list.append(int(vcf_filter))   # 5
         l = len(data_list)
         data_list.extend([0]*PLOIDY*3)      # 6-29
         data_list.append(coverage)          # 30
-        data_list.append(label)             # 31
+        data_list.append(map_quality)       # 31
+        data_list.append(base_quality)      # 32
+        data_list.append(label)             # 33
 
         # convert data list to numpy Float vector
         data_vector = numpy.array(data_list, dtype=numpy.float32).reshape((len(data_list),1))
@@ -255,7 +265,7 @@ class CandidateLabeler:
         data_vector[l:l+PLOIDY*3] = site_frequency_vector.reshape((PLOIDY*3,1))
 
         # print(filter,int(filter))
-        # print(numpy.array2string(data_vector.T, separator="\t", precision=4, max_line_width=500))
+        print(numpy.array2string(data_vector.T, separator="\t", precision=4, max_line_width=500))
 
         return data_vector
 
@@ -281,6 +291,9 @@ class CandidateLabeler:
 
             site_start = None
             site_coverage = None
+            site_map_quality = None
+            site_base_quality = None
+
             site_PASS = True
 
             for candidate in candidate_sites[pos]:
@@ -294,6 +307,8 @@ class CandidateLabeler:
                     all_allele_sequences = candidate[ALLELES]
                     frequencies = candidate[FREQUENCIES]
                     coverage = candidate[COVERAGE]
+                    map_quality = candidate[MAP_QUALITY]
+                    base_quality = candidate[BASE_QUALITY]
 
                     alleles = [alt1, alt2]
 
@@ -312,6 +327,12 @@ class CandidateLabeler:
 
                     if site_coverage is None:
                         site_coverage = coverage
+
+                    if site_map_quality is None:
+                        site_map_quality = map_quality
+
+                    if site_base_quality is None:
+                        site_base_quality = base_quality
 
                     if vcf_quality_field != "PASS" and vcf_quality_field != '.':
                         site_PASS = False
@@ -338,7 +359,9 @@ class CandidateLabeler:
                                                 alleles=site_alleles,
                                                 coverage=site_coverage,
                                                 support=support,
-                                                filter=site_PASS)
+                                                vcf_filter=site_PASS,
+                                                map_quality=site_map_quality,
+                                                base_quality=site_base_quality)
 
             all_labeled_vectors.append(vector)
 
