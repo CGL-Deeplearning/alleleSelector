@@ -230,13 +230,13 @@ class CandidateLabeler:
         site_frequency_list = self._generate_fixed_size_freq_list(frequencies)
 
         # normalize by coverage depth
-        site_frequency_vector = numpy.array(site_frequency_list,dtype=numpy.float32)/coverage
+        site_frequency_vector = numpy.array(site_frequency_list, dtype=numpy.float32)/coverage
 
         chromosome_number = self._get_chromosome_number(chromosome_name)
         label = int(support)
 
         # cap and normalize coverage (max = 1000)
-        coverage = min(coverage,1000)
+        coverage = min(coverage, 1000)
         coverage = float(coverage)/1000
 
         data_list.append(chromosome_number) # 0
@@ -246,7 +246,7 @@ class CandidateLabeler:
         data_list.append(coverage)          # 29
         data_list.append(label)             # 30
 
-        data_vector = numpy.array(data_list,dtype=numpy.float32).reshape((len(data_list),1))
+        data_vector = numpy.array(data_list, dtype=numpy.float32).reshape((len(data_list),1))
 
         data_vector[5:29] = site_frequency_vector.reshape((PLOIDY*3,1))
 
@@ -274,6 +274,7 @@ class CandidateLabeler:
 
             site_start = None
             site_coverage = None
+            site_PASS = True
 
             for candidate in candidate_sites[pos]:
                 if len(candidate) > 0:
@@ -297,7 +298,7 @@ class CandidateLabeler:
                                                         alleles=alleles,
                                                         rec_type=rec_type)
 
-                    site_genotypes.append(genotype[0])
+                    vcf_quality_field = genotype[1]
 
                     if site_start is None:
                         site_start = allele_start
@@ -305,8 +306,13 @@ class CandidateLabeler:
                     if site_coverage is None:
                         site_coverage = coverage
 
+                    if vcf_quality_field != "PASS" and vcf_quality_field != '.':
+                        site_PASS = False
+
                     site_frequencies.append(frequencies)
                     site_alleles.append(all_allele_sequences)
+                    site_genotypes.append(genotype[0])
+
 
                 else:
                     # generate null vectors, since the site contains no edits of this type
@@ -317,17 +323,18 @@ class CandidateLabeler:
                     site_alleles.append(all_allele_sequences)
                     site_genotypes.append(0)
 
-            support = self._is_supported(site_genotypes)
+            if site_PASS:
+                support = self._is_supported(site_genotypes)
 
-            vector = self._generate_data_vector(chromosome_name=chromosome_name,
-                                                start=site_start,
-                                                genotypes=site_genotypes,
-                                                frequencies=site_frequencies,
-                                                alleles=site_alleles,
-                                                coverage=site_coverage,
-                                                support=support)
+                vector = self._generate_data_vector(chromosome_name=chromosome_name,
+                                                    start=site_start,
+                                                    genotypes=site_genotypes,
+                                                    frequencies=site_frequencies,
+                                                    alleles=site_alleles,
+                                                    coverage=site_coverage,
+                                                    support=support)
 
-            all_labeled_vectors.append(vector)
+                all_labeled_vectors.append(vector)
 
         # if there is no data for this region, append an empty vector
         if len(all_labeled_vectors) == 0:
