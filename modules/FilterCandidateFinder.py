@@ -131,18 +131,21 @@ class CandidateFinder:
 
         for i in range(start, stop):
             self.coverage[i] += 1
-            self.map_quality[i].update(read_mapping_quality)
-            self.base_quality[i].update(read_base_qualities[i-alignment_position])
 
             allele = read_sequence[i-alignment_position]
             ref = ref_sequence[i-alignment_position]
 
             if allele != ref:
+                # only update qualities using reads that contain mismatches
+                self.base_quality[i].update(read_base_qualities[i-alignment_position])
+                self.map_quality[i].update(read_mapping_quality)
+
                 self._update_read_allele_dictionary(i, allele, MISMATCH_ALLELE)
                 # increase mismatch count
                 self.mismatch_count[i] += 1
                 # increase the edit count
                 self.edit_count[i] += 1
+
             # this slows things down a lot. Don't add reference allele to the dictionary if we don't use them
             # else:
                 # self._update_read_allele_dictionary(i, allele, MATCH_ALLELE)
