@@ -151,14 +151,14 @@ class VCFFileProcessor:
         :param alt: Alternate allele
         :return:
         """
-        if len(ref) == 1 and len(alt) == 1:
+        if len(ref) == len(alt):
             return 'SNP'
         elif len(ref) < len(alt):
             return 'IN'
         elif len(ref) > len(alt):
             return 'DEL'
         else:
-            raise ValueError('INVALID GENOTYPE CLASS \n' + rec)
+            raise ValueError('INVALID GENOTYPE CLASS \n' + str(rec))
 
     @staticmethod
     def get_genotype_type(genotype):
