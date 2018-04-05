@@ -33,9 +33,16 @@ Region: A genomic region of interest where we want to find possible variant cand
 Window: A window in genomic region where there can be multiple alleles
 
 A region can have multiple windows and each window belongs to a region.
+
+local:
+python3 filter_train_bed_generator.py --ref /Users/saureous/data/chr1.fa --bam /Users/saureous/data/chr1.sorted.bam --vcf /Users/saureous/data/NA12878_S1.genome.vcf.gz --bed /Users/saureous/data/ConfidentRegions.hg19.chr1.bed --chromosome_name chr1 --edit_threshold 2 --max_threads 1 >out.txt
+
+jarvis:
+python3 filter_train_bed_generator.py --ref /data/users/ryan/chr1.fa --bam /data/users/ryan/chr1.sorted.bam --vcf /data/users/ryan/NA12878_S1.genome.vcf.gz --bed /data/users/ryan/ConfidentRegions.hg19.chr1.bed --chromosome_name chr1 --edit_threshold 4 --max_threads 80
+
 """
 
-DEBUG_PRINT_CANDIDATES = False
+DEBUG_PRINT_CANDIDATES = True
 DEBUG_TIME_PROFILE = False
 
 
@@ -144,7 +151,7 @@ class View:
         """
         start_time = time.time()
         # self.parse_region(start_position=121400000, end_position=121600000)
-        self.parse_region(start_position=100000, end_position=600000)
+        self.parse_region(start_position=84894055, end_position=84894059)
         end_time = time.time()
         print("TOTAL TIME ELAPSED: ", end_time-start_time)
 
