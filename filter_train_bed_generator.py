@@ -42,7 +42,7 @@ python3 filter_train_bed_generator.py --ref /data/users/ryan/chr1.fa --bam /data
 
 """
 
-DEBUG_PRINT_CANDIDATES = True
+DEBUG_PRINT_CANDIDATES = False
 DEBUG_TIME_PROFILE = False
 
 
